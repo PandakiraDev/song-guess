@@ -38,6 +38,10 @@ export interface Room {
   status: RoomStatus;
   settings: RoomSettings;
   currentSongIndex: number;
+  shuffledSongIds?: string[]; // Song IDs in shuffled order for the game
+  votingActive?: boolean; // Whether voting is currently active (synced across clients)
+  playbackStarted?: boolean; // Whether video player should render (ads may play)
+  musicPlaying?: boolean; // Whether actual music should play (after all ready, synced start)
   createdAt: Timestamp;
 }
 
@@ -51,6 +55,8 @@ export interface Player {
   streak: number;
   joinedAt: Timestamp;
   isReady: boolean;
+  readyForSong?: boolean; // Video loaded and ready
+  contentPlaying?: boolean; // Actual music content is playing (after ads)
 }
 
 // Song Types

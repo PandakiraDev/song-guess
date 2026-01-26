@@ -55,6 +55,9 @@ export const createRoom = async (hostId: string, hostName: string, hostAvatar: s
     status: 'lobby',
     settings: defaultRoomSettings,
     currentSongIndex: -1,
+    playbackStarted: false,
+    musicPlaying: false,
+    votingActive: false,
     createdAt: serverTimestamp() as Timestamp,
   };
 
@@ -109,11 +112,18 @@ export const joinRoomByCode = async (
   const room = await getRoomByCode(code);
 
   if (!room) {
-    throw new Error('Room not found');
+    throw new Error('Room not found. Please check the code and try again.');
   }
 
   if (room.status !== 'lobby') {
-    throw new Error('Game already in progress');
+    throw new Error('Cannot join - game is already in progress');
+  }
+
+  // Check if player is already in the room
+  const existingPlayer = await getDoc(doc(db, 'rooms', room.id, 'players', playerId));
+  if (existingPlayer.exists()) {
+    // Player already in room - just return the room (allows rejoin)
+    return room;
   }
 
   await addPlayerToRoom(room.id, playerId, playerName, playerAvatar, false);
@@ -137,6 +147,8 @@ export const addPlayerToRoom = async (
     streak: 0,
     joinedAt: serverTimestamp() as Timestamp,
     isReady: false,
+    readyForSong: false,
+    contentPlaying: false,
   };
 
   await setDoc(doc(db, 'rooms', roomId, 'players', playerId), player);
@@ -150,14 +162,19 @@ export const removePlayerFromRoom = async (
   await deleteDoc(doc(db, 'rooms', roomId, 'players', playerId));
 };
 
-// Update room settings
+// Update room settings (merge with existing)
 export const updateRoomSettings = async (
   roomId: string,
   settings: Partial<RoomSettings>
 ): Promise<void> => {
-  await updateDoc(doc(db, 'rooms', roomId), {
-    settings: settings,
-  });
+  // Use dot notation to merge individual settings fields
+  const updates: Record<string, any> = {};
+  for (const [key, value] of Object.entries(settings)) {
+    if (value !== undefined) {
+      updates[`settings.${key}`] = value;
+    }
+  }
+  await updateDoc(doc(db, 'rooms', roomId), updates);
 };
 
 // Update room status
@@ -189,34 +206,52 @@ export const getPlayersInRoom = async (roomId: string): Promise<Player[]> => {
 // Subscribe to room changes
 export const subscribeToRoom = (
   roomId: string,
-  callback: (room: Room | null) => void
+  callback: (room: Room | null) => void,
+  onError?: (error: Error) => void
 ): (() => void) => {
-  return onSnapshot(doc(db, 'rooms', roomId), (snapshot) => {
-    if (!snapshot.exists()) {
-      callback(null);
-      return;
-    }
+  return onSnapshot(
+    doc(db, 'rooms', roomId),
+    (snapshot) => {
+      if (!snapshot.exists()) {
+        callback(null);
+        return;
+      }
 
-    callback({
-      id: snapshot.id,
-      ...snapshot.data(),
-    } as Room);
-  });
+      callback({
+        id: snapshot.id,
+        ...snapshot.data(),
+      } as Room);
+    },
+    (error) => {
+      console.error('Room subscription error:', error);
+      onError?.(error);
+      callback(null);
+    }
+  );
 };
 
 // Subscribe to players in room
 export const subscribeToPlayers = (
   roomId: string,
-  callback: (players: Player[]) => void
+  callback: (players: Player[]) => void,
+  onError?: (error: Error) => void
 ): (() => void) => {
-  return onSnapshot(collection(db, 'rooms', roomId, 'players'), (snapshot) => {
-    const players = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Player[];
+  return onSnapshot(
+    collection(db, 'rooms', roomId, 'players'),
+    (snapshot) => {
+      const players = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Player[];
 
-    callback(players);
-  });
+      callback(players);
+    },
+    (error) => {
+      console.error('Players subscription error:', error);
+      onError?.(error);
+      callback([]);
+    }
+  );
 };
 
 // Update player ready status
@@ -227,6 +262,39 @@ export const updatePlayerReadyStatus = async (
 ): Promise<void> => {
   await updateDoc(doc(db, 'rooms', roomId, 'players', playerId), {
     isReady: isReady,
+  });
+};
+
+// Update player ready for song status (after video/ads loaded)
+export const updatePlayerReadyForSong = async (
+  roomId: string,
+  playerId: string,
+  readyForSong: boolean
+): Promise<void> => {
+  await updateDoc(doc(db, 'rooms', roomId, 'players', playerId), {
+    readyForSong: readyForSong,
+  });
+};
+
+// Reset all players' readyForSong status
+export const resetAllPlayersReadyForSong = async (
+  roomId: string
+): Promise<void> => {
+  const playersSnapshot = await getDocs(collection(db, 'rooms', roomId, 'players'));
+  const updates = playersSnapshot.docs.map((playerDoc) =>
+    updateDoc(playerDoc.ref, { readyForSong: false, contentPlaying: false })
+  );
+  await Promise.all(updates);
+};
+
+// Update player's contentPlaying status (actual music playing after ads)
+export const updatePlayerContentPlaying = async (
+  roomId: string,
+  playerId: string,
+  contentPlaying: boolean
+): Promise<void> => {
+  await updateDoc(doc(db, 'rooms', roomId, 'players', playerId), {
+    contentPlaying: contentPlaying,
   });
 };
 

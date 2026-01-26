@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -23,6 +23,13 @@ export const Timer: React.FC<TimerProps> = ({
 }) => {
   const [timeLeft, setTimeLeft] = useState(duration);
   const progress = useSharedValue(1);
+  const hasCompleted = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+
+  // Keep onComplete ref updated
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   const sizeMap = {
     small: { dimension: 60, fontSize: fontSize.lg, strokeWidth: 4 },
@@ -35,13 +42,14 @@ export const Timer: React.FC<TimerProps> = ({
   const circumference = 2 * Math.PI * radius;
 
   useEffect(() => {
+    hasCompleted.current = false;
+    setTimeLeft(duration);
     progress.value = withTiming(0, { duration: duration * 1000 });
 
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
-          onComplete?.();
           return 0;
         }
         return prev - 1;
@@ -49,7 +57,18 @@ export const Timer: React.FC<TimerProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [duration, onComplete]);
+  }, [duration]);
+
+  // Handle completion in separate effect to avoid setState during render
+  useEffect(() => {
+    if (timeLeft === 0 && !hasCompleted.current) {
+      hasCompleted.current = true;
+      // Use setTimeout to ensure we're not in a render cycle
+      setTimeout(() => {
+        onCompleteRef.current?.();
+      }, 0);
+    }
+  }, [timeLeft]);
 
   const animatedCircleStyle = useAnimatedStyle(() => {
     const strokeDashoffset = interpolate(progress.value, [0, 1], [circumference, 0]);

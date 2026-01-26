@@ -1,15 +1,6 @@
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  updateProfile,
-  onAuthStateChanged,
-  User as FirebaseUser,
-  GoogleAuthProvider,
-  signInWithCredential,
-} from 'firebase/auth';
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { db } from './firebase';
 import { User, GuestUser, AVATARS } from '../types';
 
 // Generate a random guest ID
@@ -38,11 +29,11 @@ export const signUpWithEmail = async (
   password: string,
   displayName: string
 ): Promise<User> => {
-  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  const userCredential = await auth().createUserWithEmailAndPassword(email, password);
   const user = userCredential.user;
 
   // Update display name
-  await updateProfile(user, { displayName });
+  await user.updateProfile({ displayName });
 
   // Create user document in Firestore
   const userData: Omit<User, 'id'> = {
@@ -69,14 +60,14 @@ export const signInWithEmail = async (
   email: string,
   password: string
 ): Promise<User | null> => {
-  const userCredential = await signInWithEmailAndPassword(auth, email, password);
+  const userCredential = await auth().signInWithEmailAndPassword(email, password);
   return getUserData(userCredential.user.uid);
 };
 
 // Sign in with Google
 export const signInWithGoogle = async (idToken: string): Promise<User | null> => {
-  const credential = GoogleAuthProvider.credential(idToken);
-  const userCredential = await signInWithCredential(auth, credential);
+  const googleCredential = auth.GoogleAuthProvider.credential(idToken);
+  const userCredential = await auth().signInWithCredential(googleCredential);
   const user = userCredential.user;
 
   // Check if user document exists
@@ -108,7 +99,7 @@ export const signInWithGoogle = async (idToken: string): Promise<User | null> =>
 
 // Sign out
 export const signOut = async (): Promise<void> => {
-  await firebaseSignOut(auth);
+  await auth().signOut();
 };
 
 // Get user data from Firestore
@@ -152,12 +143,12 @@ export const updateUserStats = async (
 
 // Subscribe to auth state changes
 export const subscribeToAuthState = (
-  callback: (user: FirebaseUser | null) => void
+  callback: (user: FirebaseAuthTypes.User | null) => void
 ): (() => void) => {
-  return onAuthStateChanged(auth, callback);
+  return auth().onAuthStateChanged(callback);
 };
 
 // Get current Firebase user
-export const getCurrentUser = (): FirebaseUser | null => {
-  return auth.currentUser;
+export const getCurrentUser = (): FirebaseAuthTypes.User | null => {
+  return auth().currentUser;
 };

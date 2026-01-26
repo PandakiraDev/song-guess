@@ -1,21 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
+  Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
 import { RootStackParamList } from '../types';
 import { Button, Card, Timer } from '../components/common';
-import { YouTubePlayer, VotingCard, Scoreboard, RevealAnimation } from '../components/game';
+import { YouTubePlayer, VotingCard, RevealAnimation } from '../components/game';
 import { useRoom } from '../hooks/useRoom';
 import { useGame } from '../hooks/useGame';
 import { useAuth } from '../hooks/useAuth';
+import { decodeHtmlEntities } from '../utils/scoring';
 
 type GameScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Game'>;
@@ -25,24 +27,43 @@ type GameScreenProps = {
 export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => {
   const { roomId } = route.params;
   const { user } = useAuth();
-  const { room, players, isHost } = useRoom(roomId);
+  const { room, players, isHost, roomDeleted } = useRoom(roomId);
   const {
     currentSong,
     currentSongIndex,
     totalSongs,
     hasVoted,
     myVote,
-    isRevealing,
-    revealedSong,
-    roundResults,
     vote,
-    startVotingTimer,
     reveal,
     nextSong,
+    playbackStarted,
+    musicPlaying,
+    allPlayersContentReady,
+    allPlayersVoted,
+    votingActive,
+    startPlayback,
+    markContentReady,
   } = useGame(roomId);
 
   const [showVideo, setShowVideo] = useState(true);
-  const [votingActive, setVotingActive] = useState(false);
+  const allVotedTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasTriggeredAutoReveal = useRef(false);
+
+  // Derive states from room (synced across all clients)
+  const isRevealing = room?.status === 'reveal';
+
+  // Handle room deletion (host left)
+  useEffect(() => {
+    if (roomDeleted) {
+      Alert.alert(
+        'Game Ended',
+        'The host has closed the room.',
+        [{ text: 'OK', onPress: () => navigation.replace('Home') }],
+        { cancelable: false }
+      );
+    }
+  }, [roomDeleted, navigation]);
 
   // Handle room status changes
   useEffect(() => {
@@ -51,15 +72,64 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
     }
   }, [room?.status, roomId, navigation]);
 
-  // Start voting when video is ready
-  const handleVideoReady = () => {
-    setVotingActive(true);
-    startVotingTimer();
+  // Reset local state when moving to next song
+  useEffect(() => {
+    if (room?.status === 'playing') {
+      setShowVideo(true);
+      hasTriggeredAutoReveal.current = false;
+      // Clear any pending timer
+      if (allVotedTimerRef.current) {
+        clearTimeout(allVotedTimerRef.current);
+        allVotedTimerRef.current = null;
+      }
+    }
+  }, [room?.status, room?.currentSongIndex]);
+
+  // Auto-reveal when all players have voted (after 2 second delay)
+  useEffect(() => {
+    // Only host triggers reveal, and only during active voting
+    if (!isHost || !votingActive || isRevealing) {
+      return;
+    }
+
+    // Check if all players voted and we haven't triggered yet
+    if (allPlayersVoted && !hasTriggeredAutoReveal.current) {
+      hasTriggeredAutoReveal.current = true;
+
+      // Clear any existing timer
+      if (allVotedTimerRef.current) {
+        clearTimeout(allVotedTimerRef.current);
+      }
+
+      allVotedTimerRef.current = setTimeout(() => {
+        reveal();
+      }, 2000); // 2 second delay
+    }
+  }, [isHost, votingActive, isRevealing, allPlayersVoted, reveal]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (allVotedTimerRef.current) {
+        clearTimeout(allVotedTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Content is ready (after ads) - mark player as ready
+  const handleContentReady = async () => {
+    await markContentReady();
   };
 
-  // Handle voting time end
+  // Host starts the round (loads videos for everyone)
+  const handleStartRound = () => {
+    if (isHost) {
+      startPlayback();
+    }
+  };
+
+  // Handle voting time end (host triggers reveal which sets votingActive=false in Firestore)
   const handleVotingComplete = () => {
-    setVotingActive(false);
     if (isHost) {
       reveal();
     }
@@ -68,18 +138,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
   // Handle next song
   const handleNextSong = () => {
     nextSong();
-    setShowVideo(true);
-    setVotingActive(false);
+    // Note: showVideo and votingActive are reset via the useEffect watching room.status
   };
-
-  // Get current player's vote result
-  const getMyResult = () => {
-    if (!user || !currentSong) return null;
-    return roundResults.find((r) => r.playerId === user.id);
-  };
-
-  const myResult = getMyResult();
-  const songOwner = players.find((p) => p.id === currentSong?.addedBy);
 
   if (!room || !currentSong) {
     return (
@@ -118,8 +178,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Video Player */}
-        {showVideo && (
+        {/* Video Player - render after host clicks Load Videos */}
+        {showVideo && playbackStarted && (
           <View style={styles.videoContainer}>
             <YouTubePlayer
               videoId={currentSong.youtubeId}
@@ -129,19 +189,104 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
                   ? room.settings.playbackDuration
                   : undefined
               }
-              onReady={handleVideoReady}
-              autoPlay
+              onContentReady={handleContentReady}
+              autoPlay={true}
+              playing={musicPlaying}
             />
           </View>
         )}
 
-        {/* Song Info (minimal during voting) */}
-        {!isRevealing && (
+        {/* Placeholder before videos load */}
+        {showVideo && !playbackStarted && (
+          <View style={styles.videoPlaceholder}>
+            <Ionicons name="musical-notes" size={48} color={colors.neonPink} />
+            <Text style={styles.videoPlaceholderText}>
+              {isHost ? 'Click "Load Videos" to start' : 'Waiting for host...'}
+            </Text>
+          </View>
+        )}
+
+        {/* Song Info - only show after all players finish ads */}
+        {!isRevealing && votingActive && (
           <Card style={styles.songInfo}>
             <Ionicons name="musical-note" size={20} color={colors.neonPink} />
             <Text style={styles.songTitle} numberOfLines={1}>
-              {currentSong.title}
+              {decodeHtmlEntities(currentSong.title)}
             </Text>
+          </Card>
+        )}
+
+        {/* Start Round Button (Host only, before playback starts) */}
+        {!playbackStarted && !isRevealing && isHost && (
+          <Button
+            title="Start Round"
+            onPress={handleStartRound}
+            size="large"
+            fullWidth
+            icon={<Ionicons name="play" size={24} color={colors.textPrimary} />}
+          />
+        )}
+
+        {/* Waiting for host message (non-host, before playback starts) */}
+        {!playbackStarted && !isRevealing && !isHost && (
+          <Card style={styles.waitingCard}>
+            <Ionicons name="hourglass" size={24} color={colors.neonBlue} />
+            <Text style={styles.waitingText}>
+              Waiting for host to start the round...
+            </Text>
+          </Card>
+        )}
+
+        {/* Loading status - waiting for all players to finish ads */}
+        {playbackStarted && !votingActive && !isRevealing && (
+          <Card style={styles.loadingStatusCard}>
+            <View style={styles.loadingStatusHeader}>
+              <Ionicons
+                name={allPlayersContentReady ? 'checkmark-circle' : 'sync'}
+                size={24}
+                color={allPlayersContentReady ? colors.success : colors.neonBlue}
+              />
+              <Text style={styles.loadingStatusTitle}>
+                {allPlayersContentReady
+                  ? 'Starting...'
+                  : 'Waiting for players'
+                }
+              </Text>
+              <Text style={styles.loadingStatusCount}>
+                {players.filter(p => p.contentPlaying).length}/{players.length}
+              </Text>
+            </View>
+            <View style={styles.playerStatusList}>
+              {players.map((player) => (
+                <View
+                  key={player.id}
+                  style={[
+                    styles.playerStatusItem,
+                    player.contentPlaying && styles.playerStatusItemReady
+                  ]}
+                >
+                  <View style={styles.playerStatusIcon}>
+                    <Ionicons
+                      name={player.contentPlaying ? 'checkmark' : 'hourglass'}
+                      size={14}
+                      color={player.contentPlaying ? colors.success : colors.warning}
+                    />
+                  </View>
+                  <Text
+                    style={styles.playerStatusName}
+                    numberOfLines={1}
+                  >
+                    {player.name}
+                  </Text>
+                  <Text style={[
+                    styles.playerStatusLabel,
+                    { color: player.contentPlaying ? colors.success : colors.warning }
+                  ]}>
+                    {player.contentPlaying ? 'Ready' : 'Ad'}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </Card>
         )}
 
@@ -173,53 +318,34 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
           <Card style={styles.votedCard}>
             <Ionicons name="checkmark-circle" size={24} color={colors.success} />
             <Text style={styles.votedText}>
-              Vote submitted! Waiting for others...
+              {allPlayersVoted
+                ? 'Everyone voted! Revealing soon...'
+                : 'Vote submitted! Waiting for others...'}
             </Text>
           </Card>
         )}
 
-        {/* Mini Scoreboard */}
-        <View style={styles.scoreboardSection}>
-          <Text style={styles.sectionTitle}>Scores</Text>
-          <Scoreboard
-            players={players}
-            currentUserId={user?.id}
-            showPodium={false}
-          />
-        </View>
+        {/* All Voted Message (for song owner) */}
+        {isOwnSong && !isRevealing && allPlayersVoted && votingActive && (
+          <Card style={styles.allVotedCard}>
+            <Ionicons name="people" size={24} color={colors.neonGreen} />
+            <Text style={styles.allVotedText}>
+              Everyone voted! Revealing soon...
+            </Text>
+          </Card>
+        )}
+
       </ScrollView>
 
       {/* Reveal Animation Overlay */}
-      {isRevealing && songOwner && (
+      {isRevealing && (
         <RevealAnimation
-          song={currentSong}
-          player={songOwner}
-          isCorrect={myResult?.correct || false}
-          points={myResult?.points || 0}
+          isHost={isHost}
+          isLastSong={currentSongIndex + 1 >= totalSongs}
+          onNext={handleNextSong}
+          roundNumber={currentSongIndex + 1}
+          totalRounds={totalSongs}
         />
-      )}
-
-      {/* Next Song Button (Host, after reveal) */}
-      {isHost && isRevealing && (
-        <View style={styles.footer}>
-          <Button
-            title={currentSongIndex + 1 >= totalSongs ? 'View Results' : 'Next Song'}
-            onPress={handleNextSong}
-            size="large"
-            fullWidth
-            icon={
-              <Ionicons
-                name={
-                  currentSongIndex + 1 >= totalSongs
-                    ? 'trophy'
-                    : 'arrow-forward'
-                }
-                size={24}
-                color={colors.textPrimary}
-              />
-            }
-          />
-        </View>
       )}
     </SafeAreaView>
   );
@@ -269,6 +395,21 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
   },
+  videoPlaceholder: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  videoPlaceholderText: {
+    color: colors.textSecondary,
+    fontSize: fontSize.md,
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
+  },
   songInfo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -307,16 +448,89 @@ const styles = StyleSheet.create({
     color: colors.success,
     fontSize: fontSize.md,
   },
-  scoreboardSection: {
+  allVotedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.neonGreen + '20',
+    borderWidth: 1,
+    borderColor: colors.neonGreen,
+  },
+  allVotedText: {
+    flex: 1,
+    color: colors.neonGreen,
+    fontSize: fontSize.md,
+  },
+  waitingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.neonBlue + '20',
+    borderWidth: 1,
+    borderColor: colors.neonBlue,
+  },
+  waitingText: {
+    flex: 1,
+    color: colors.neonBlue,
+    fontSize: fontSize.md,
+  },
+  loadingStatusCard: {
+    padding: spacing.md,
+  },
+  loadingStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surface,
+  },
+  loadingStatusTitle: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
+  },
+  loadingStatusCount: {
+    color: colors.neonBlue,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+  },
+  playerStatusList: {
     gap: spacing.sm,
   },
-  sectionTitle: {
-    color: colors.textSecondary,
+  playerStatusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
+  },
+  playerStatusItemReady: {
+    backgroundColor: colors.success + '15',
+    borderWidth: 1,
+    borderColor: colors.success + '30',
+  },
+  playerStatusIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playerStatusName: {
+    flex: 1,
+    color: colors.textPrimary,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
   },
-  footer: {
-    padding: spacing.lg,
+  playerStatusLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    textTransform: 'uppercase',
   },
 });
 

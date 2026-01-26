@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -7,195 +7,242 @@ import Animated, {
   withSequence,
   withDelay,
   withTiming,
-  interpolate,
-  Extrapolate,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../theme/colors';
-import { Player, Song } from '../../types';
-import { Avatar, Card } from '../common';
 
 interface RevealAnimationProps {
-  song: Song;
-  player: Player;
-  isCorrect: boolean;
-  points?: number;
-  onAnimationComplete?: () => void;
+  isHost?: boolean;
+  isLastSong?: boolean;
+  onNext?: () => void;
+  roundNumber?: number;
+  totalRounds?: number;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const RevealAnimation: React.FC<RevealAnimationProps> = ({
-  song,
-  player,
-  isCorrect,
-  points = 0,
-  onAnimationComplete,
+  isHost = false,
+  isLastSong = false,
+  onNext,
+  roundNumber = 1,
+  totalRounds = 1,
 }) => {
-  const scale = useSharedValue(0);
-  const opacity = useSharedValue(0);
-  const resultScale = useSharedValue(0);
-  const resultOpacity = useSharedValue(0);
-  const pointsY = useSharedValue(0);
-  const pointsOpacity = useSharedValue(0);
+  // Animation values
+  const containerOpacity = useSharedValue(0);
+  const cardScale = useSharedValue(0.8);
+  const cardOpacity = useSharedValue(0);
+  const iconScale = useSharedValue(0);
 
   useEffect(() => {
-    // Main card animation
-    opacity.value = withTiming(1, { duration: 300 });
-    scale.value = withSequence(
-      withSpring(1.1, { damping: 8, stiffness: 200 }),
-      withSpring(1, { damping: 15, stiffness: 150 })
-    );
+    // Fade in container
+    containerOpacity.value = withTiming(1, { duration: 250 });
 
-    // Result animation (delayed)
-    resultOpacity.value = withDelay(500, withTiming(1, { duration: 300 }));
-    resultScale.value = withDelay(
-      500,
+    // Card entrance
+    cardOpacity.value = withTiming(1, { duration: 300 });
+    cardScale.value = withSpring(1, { damping: 18, stiffness: 200 });
+
+    // Icon animation
+    iconScale.value = withDelay(
+      200,
       withSequence(
-        withSpring(1.2, { damping: 8, stiffness: 200 }),
-        withSpring(1, { damping: 15, stiffness: 150 })
+        withSpring(1.15, { damping: 8, stiffness: 250 }),
+        withSpring(1, { damping: 12, stiffness: 150 })
       )
     );
-
-    // Points animation (delayed more)
-    if (isCorrect && points > 0) {
-      pointsOpacity.value = withDelay(800, withTiming(1, { duration: 300 }));
-      pointsY.value = withDelay(
-        800,
-        withSequence(
-          withSpring(-20, { damping: 8, stiffness: 200 }),
-          withSpring(0, { damping: 15, stiffness: 150 })
-        )
-      );
-    }
-
-    // Callback after animation
-    const timer = setTimeout(() => {
-      onAnimationComplete?.();
-    }, 2000);
-
-    return () => clearTimeout(timer);
   }, []);
 
-  const cardAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
+  // Animated styles
+  const containerStyle = useAnimatedStyle(() => ({
+    opacity: containerOpacity.value,
   }));
 
-  const resultAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: resultScale.value }],
-    opacity: resultOpacity.value,
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: cardOpacity.value,
+    transform: [{ scale: cardScale.value }],
   }));
 
-  const pointsAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: pointsY.value }],
-    opacity: pointsOpacity.value,
+  const iconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: iconScale.value }],
   }));
 
   return (
-    <View style={styles.container}>
-      <Animated.View style={[styles.card, cardAnimatedStyle]}>
-        <Card variant="neon" neonColor={isCorrect ? 'green' : 'pink'} style={styles.innerCard}>
-          <Text style={styles.label}>Added by</Text>
-
-          <Avatar
-            name={player.name}
-            avatarId={player.avatar}
-            size="xlarge"
-            showBorder
-            borderColor={isCorrect ? colors.success : colors.neonPink}
-          />
-
-          <Text style={styles.playerName}>{player.name}</Text>
-
-          <Animated.View style={[styles.resultContainer, resultAnimatedStyle]}>
-            <View
-              style={[
-                styles.resultBadge,
-                { backgroundColor: isCorrect ? colors.success + '30' : colors.error + '30' },
-              ]}
+    <Modal
+      visible={true}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View style={[styles.container, containerStyle]}>
+          <Animated.View style={[styles.card, cardStyle]}>
+            <LinearGradient
+              colors={[colors.neonPink + '20', colors.neonPink + '05']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.cardGradient}
             >
-              <Ionicons
-                name={isCorrect ? 'checkmark-circle' : 'close-circle'}
-                size={32}
-                color={isCorrect ? colors.success : colors.error}
-              />
-              <Text
-                style={[
-                  styles.resultText,
-                  { color: isCorrect ? colors.success : colors.error },
-                ]}
-              >
-                {isCorrect ? 'Correct!' : 'Wrong!'}
-              </Text>
-            </View>
+              {/* Content */}
+              <View style={styles.content}>
+                {/* Icon */}
+                <Animated.View style={[styles.iconWrapper, iconStyle]}>
+                  <View style={styles.iconLarge}>
+                    <Ionicons
+                      name="musical-notes"
+                      size={48}
+                      color={colors.background}
+                    />
+                  </View>
+                </Animated.View>
+
+                {/* Title */}
+                <Text style={styles.titleText}>
+                  Round Complete!
+                </Text>
+
+                {/* Progress */}
+                <Text style={styles.progressText}>
+                  {roundNumber} of {totalRounds} songs
+                </Text>
+
+                {/* Message */}
+                <Text style={styles.messageText}>
+                  {isLastSong
+                    ? 'All songs played! Ready to see the results?'
+                    : 'Get ready for the next song...'}
+                </Text>
+              </View>
+            </LinearGradient>
           </Animated.View>
 
-          {isCorrect && points > 0 && (
-            <Animated.View style={[styles.pointsContainer, pointsAnimatedStyle]}>
-              <Text style={styles.pointsText}>+{points}</Text>
-              <Text style={styles.pointsLabel}>points</Text>
-            </Animated.View>
-          )}
-        </Card>
-      </Animated.View>
-    </View>
+          {/* Action Button */}
+          <View style={styles.footer}>
+            {isHost && onNext ? (
+              <TouchableOpacity style={styles.nextButton} onPress={onNext} activeOpacity={0.8}>
+                <Ionicons
+                  name={isLastSong ? 'trophy' : 'arrow-forward'}
+                  size={24}
+                  color={colors.background}
+                />
+                <Text style={styles.nextButtonText}>
+                  {isLastSong ? 'View Results' : 'Next Song'}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.waitingBadge}>
+                <Ionicons name="hourglass" size={18} color={colors.neonBlue} />
+                <Text style={styles.waitingText}>Waiting for host...</Text>
+              </View>
+            )}
+          </View>
+        </Animated.View>
+      </ScrollView>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  scrollContent: {
+    flexGrow: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+  },
   container: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background + 'E0',
-    zIndex: 100,
+    padding: spacing.lg,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.xxl,
   },
   card: {
-    width: SCREEN_WIDTH - 64,
+    width: '100%',
+    maxWidth: SCREEN_WIDTH - 48,
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.surface,
+    backgroundColor: colors.card,
   },
-  innerCard: {
+  cardGradient: {},
+  content: {
     alignItems: 'center',
-    padding: spacing.xl,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
     gap: spacing.md,
   },
-  label: {
-    color: colors.textSecondary,
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.medium,
+  iconWrapper: {
+    marginBottom: spacing.sm,
   },
-  playerName: {
-    color: colors.textPrimary,
+  iconLarge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.neonPink,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.neonPink,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 15,
+    elevation: 8,
+  },
+  titleText: {
     fontSize: fontSize.xxl,
     fontWeight: fontWeight.bold,
+    color: colors.textPrimary,
+    textAlign: 'center',
   },
-  resultContainer: {
-    marginTop: spacing.md,
+  progressText: {
+    fontSize: fontSize.md,
+    color: colors.neonPink,
+    fontWeight: fontWeight.medium,
   },
-  resultBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.round,
-  },
-  resultText: {
-    fontSize: fontSize.xl,
-    fontWeight: fontWeight.bold,
-  },
-  pointsContainer: {
-    alignItems: 'center',
-    marginTop: spacing.md,
-  },
-  pointsText: {
-    color: colors.neonGreen,
-    fontSize: fontSize.xxxl,
-    fontWeight: fontWeight.bold,
-  },
-  pointsLabel: {
+  messageText: {
     color: colors.textSecondary,
     fontSize: fontSize.sm,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+  },
+  footer: {
+    width: '100%',
+    maxWidth: SCREEN_WIDTH - 48,
+    marginTop: spacing.lg,
+  },
+  nextButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.neonPink,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.lg,
+  },
+  nextButtonText: {
+    color: colors.background,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+  },
+  waitingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.neonBlue + '20',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.neonBlue,
+  },
+  waitingText: {
+    color: colors.neonBlue,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
   },
 });
 

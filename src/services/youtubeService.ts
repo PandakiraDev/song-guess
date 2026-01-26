@@ -7,10 +7,12 @@ const YOUTUBE_API_KEY = 'AIzaSyD2xTrw7tW41AiiRLr-3vi6QWc2WaSSmus';
 // Search YouTube for videos
 export const searchYouTube = async (query: string): Promise<YouTubeSearchResult[]> => {
   try {
+    // Note: Removed videoCategoryId=10 filter to allow finding all videos,
+    // not just those officially categorized as "Music" on YouTube
     const response = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=15&q=${encodeURIComponent(
         query
-      )}&type=video&videoCategoryId=10&key=${YOUTUBE_API_KEY}`
+      )}&type=video&key=${YOUTUBE_API_KEY}`
     );
 
     if (!response.ok) {
@@ -19,12 +21,14 @@ export const searchYouTube = async (query: string): Promise<YouTubeSearchResult[
 
     const data = await response.json();
 
-    return data.items.map((item: any) => ({
-      videoId: item.id.videoId,
-      title: item.snippet.title,
-      thumbnail: item.snippet.thumbnails.medium.url,
-      channelTitle: item.snippet.channelTitle,
-    }));
+    return data.items
+      .filter((item: any) => item.id?.videoId && item.snippet?.title)
+      .map((item: any) => ({
+        videoId: item.id.videoId,
+        title: item.snippet.title,
+        thumbnail: item.snippet.thumbnails?.medium?.url || '',
+        channelTitle: item.snippet.channelTitle || '',
+      }));
   } catch (error) {
     console.error('YouTube search error:', error);
     throw error;

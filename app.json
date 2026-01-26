@@ -30,7 +30,11 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "navigationBar": {
+        "visible": "immersive",
+        "backgroundColor": "#0a0a0f"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"

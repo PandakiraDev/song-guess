@@ -1,12 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   FadeInUp,
@@ -25,7 +25,9 @@ import { Scoreboard } from '../components/game';
 import { useRoom } from '../hooks/useRoom';
 import { useGame } from '../hooks/useGame';
 import { useAuth } from '../hooks/useAuth';
-import { getRankedPlayers } from '../utils/scoring';
+import { getRankedPlayers, decodeHtmlEntities } from '../utils/scoring';
+import { updateUserStats, getUserData } from '../services/authService';
+import { useUserStore } from '../store/userStore';
 
 type ResultsScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Results'>;
@@ -38,15 +40,55 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
 }) => {
   const { roomId } = route.params;
   const { user } = useAuth();
-  const { room, players, isHost, leaveRoom } = useRoom(roomId);
+  const { room, players, isHost, leaveRoom, roomDeleted } = useRoom(roomId);
   const { songs, votes, playAgain } = useGame(roomId);
 
   const confettiScale = useSharedValue(0);
+  const statsUpdated = useRef(false);
+  const isLeavingRef = useRef(false);
 
   useEffect(() => {
     // Animate confetti
     confettiScale.value = withDelay(500, withSpring(1, { damping: 8 }));
   }, []);
+
+  // Handle room deletion (host left)
+  useEffect(() => {
+    if (roomDeleted && !isLeavingRef.current) {
+      Alert.alert(
+        'Room Closed',
+        'The host has closed the room.',
+        [{ text: 'OK', onPress: () => navigation.replace('Home') }],
+        { cancelable: false }
+      );
+    }
+  }, [roomDeleted, navigation]);
+
+  const setUser = useUserStore((state) => state.setUser);
+
+  // Update user stats once when results are shown
+  useEffect(() => {
+    const updateStats = async () => {
+      if (!user || user.isGuest || statsUpdated.current || players.length === 0) return;
+
+      const rankedList = getRankedPlayers(players);
+      const myPlayer = rankedList.find(p => p.id === user.id);
+
+      if (myPlayer) {
+        statsUpdated.current = true;
+        const isWinner = myPlayer.rank === 1;
+        await updateUserStats(user.id, isWinner, myPlayer.score);
+
+        // Refresh user data to update stats in the store
+        const updatedUser = await getUserData(user.id);
+        if (updatedUser) {
+          setUser(updatedUser);
+        }
+      }
+    };
+
+    updateStats();
+  }, [user, players, setUser]);
 
   const confettiStyle = useAnimatedStyle(() => ({
     transform: [{ scale: confettiScale.value }],
@@ -68,14 +110,17 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
 
   const handleLeaveGame = () => {
     Alert.alert(
-      'Leave Game',
-      'Are you sure you want to leave?',
+      isHost ? 'Close Room' : 'Leave Game',
+      isHost
+        ? 'Are you sure you want to close the room? All players will be removed.'
+        : 'Are you sure you want to leave?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Leave',
+          text: isHost ? 'Close' : 'Leave',
           style: 'destructive',
           onPress: async () => {
+            isLeavingRef.current = true;
             await leaveRoom();
             navigation.replace('Home');
           },
@@ -190,6 +235,73 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
             currentUserId={user?.id}
             showPodium
           />
+        </Animated.View>
+
+        {/* Round-by-Round Summary */}
+        <Animated.View entering={FadeInUp.delay(1000)}>
+          <Text style={styles.sectionTitle}>Round Summary</Text>
+          {songs.map((song, index) => {
+            const songOwner = players.find(p => p.id === song.addedBy);
+            const songVotes = votes.filter(v => v.songId === song.id);
+
+            return (
+              <Card key={song.id} style={styles.roundCard}>
+                <View style={styles.roundHeader}>
+                  <View style={styles.roundNumber}>
+                    <Text style={styles.roundNumberText}>{index + 1}</Text>
+                  </View>
+                  <View style={styles.roundInfo}>
+                    <Text style={styles.roundSongTitle} numberOfLines={2}>
+                      {decodeHtmlEntities(song.title)}
+                    </Text>
+                    <Text style={styles.roundAddedBy}>
+                      Added by: <Text style={styles.roundOwnerName}>{songOwner?.name || 'Unknown'}</Text>
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Votes for this song */}
+                <View style={styles.votesSection}>
+                  {songVotes.length > 0 ? (
+                    songVotes.map((vote) => {
+                      const voter = players.find(p => p.id === vote.playerId);
+                      const votedFor = players.find(p => p.id === vote.votedFor);
+                      const isCorrect = vote.votedFor === song.addedBy;
+
+                      return (
+                        <View key={vote.playerId} style={styles.voteRow}>
+                          <Text style={styles.voterName} numberOfLines={1}>
+                            {voter?.name || 'Unknown'}
+                          </Text>
+                          <Ionicons
+                            name="arrow-forward"
+                            size={14}
+                            color={colors.textSecondary}
+                          />
+                          <Text
+                            style={[
+                              styles.votedForName,
+                              isCorrect ? styles.voteCorrect : styles.voteWrong
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {votedFor?.name || 'Unknown'}
+                          </Text>
+                          <Ionicons
+                            name={isCorrect ? 'checkmark-circle' : 'close-circle'}
+                            size={18}
+                            color={isCorrect ? colors.success : colors.error}
+                          />
+                        </View>
+                      );
+                    })
+                  ) : (
+                    <Text style={styles.noVotesText}>No votes recorded</Text>
+                  )}
+                </View>
+              </Card>
+            );
+          })}
         </Animated.View>
       </ScrollView>
 
@@ -341,6 +453,82 @@ const styles = StyleSheet.create({
     fontSize: fontSize.lg,
     fontWeight: fontWeight.semibold,
     marginBottom: spacing.md,
+  },
+  roundCard: {
+    marginBottom: spacing.md,
+    padding: spacing.md,
+  },
+  roundHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surface,
+  },
+  roundNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.neonPink,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  roundNumberText: {
+    color: colors.background,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+  },
+  roundInfo: {
+    flex: 1,
+  },
+  roundSongTitle: {
+    color: colors.textPrimary,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
+    marginBottom: spacing.xs,
+  },
+  roundAddedBy: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+  },
+  roundOwnerName: {
+    color: colors.neonBlue,
+    fontWeight: fontWeight.semibold,
+  },
+  votesSection: {
+    gap: spacing.sm,
+  },
+  voteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+  voterName: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: fontSize.sm,
+  },
+  votedForName: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+  },
+  voteCorrect: {
+    color: colors.success,
+  },
+  voteWrong: {
+    color: colors.error,
+  },
+  noVotesText: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   footer: {
     padding: spacing.lg,

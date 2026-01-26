@@ -15,7 +15,6 @@ import {
 import { db } from './firebase';
 import { Song, Vote, Player } from '../types';
 import { getBestStartTime, getVideoDetails } from './youtubeService';
-import { calculateScore } from '../utils/scoring';
 
 // Add a song to the room
 export const addSong = async (
@@ -25,6 +24,17 @@ export const addSong = async (
   thumbnail: string,
   addedBy: string
 ): Promise<Song> => {
+  // Validate required fields to prevent Firestore errors
+  if (!youtubeId || typeof youtubeId !== 'string') {
+    throw new Error('Invalid video ID');
+  }
+  if (!title || typeof title !== 'string') {
+    throw new Error('Invalid song title');
+  }
+  if (!addedBy || typeof addedBy !== 'string') {
+    throw new Error('Invalid user ID');
+  }
+
   const songId = 'song_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
 
   // Get video details for duration
@@ -89,16 +99,25 @@ export const getSongsByPlayer = async (roomId: string, playerId: string): Promis
 // Subscribe to songs in room
 export const subscribeToSongs = (
   roomId: string,
-  callback: (songs: Song[]) => void
+  callback: (songs: Song[]) => void,
+  onError?: (error: Error) => void
 ): (() => void) => {
-  return onSnapshot(collection(db, 'rooms', roomId, 'songs'), (snapshot) => {
-    const songs = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Song[];
+  return onSnapshot(
+    collection(db, 'rooms', roomId, 'songs'),
+    (snapshot) => {
+      const songs = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Song[];
 
-    callback(songs);
-  });
+      callback(songs);
+    },
+    (error) => {
+      console.error('Songs subscription error:', error);
+      onError?.(error);
+      callback([]);
+    }
+  );
 };
 
 // Mark song as played
@@ -157,15 +176,24 @@ export const getVotesForSong = async (roomId: string, songId: string): Promise<V
 // Subscribe to votes in room
 export const subscribeToVotes = (
   roomId: string,
-  callback: (votes: Vote[]) => void
+  callback: (votes: Vote[]) => void,
+  onError?: (error: Error) => void
 ): (() => void) => {
-  return onSnapshot(collection(db, 'rooms', roomId, 'votes'), (snapshot) => {
-    const votes = snapshot.docs.map((doc) => ({
-      ...doc.data(),
-    })) as Vote[];
+  return onSnapshot(
+    collection(db, 'rooms', roomId, 'votes'),
+    (snapshot) => {
+      const votes = snapshot.docs.map((doc) => ({
+        ...doc.data(),
+      })) as Vote[];
 
-    callback(votes);
-  });
+      callback(votes);
+    },
+    (error) => {
+      console.error('Votes subscription error:', error);
+      onError?.(error);
+      callback([]);
+    }
+  );
 };
 
 // Process votes after reveal and update scores
@@ -173,7 +201,7 @@ export const processVotesForSong = async (
   roomId: string,
   songId: string,
   correctPlayerId: string,
-  votingTime: number,
+  _votingTime: number,
   players: Player[]
 ): Promise<void> => {
   const votes = await getVotesForSong(roomId, songId);
@@ -184,21 +212,8 @@ export const processVotesForSong = async (
 
     if (!player) continue;
 
-    let newStreak = player.streak;
-    let points = 0;
-
-    if (isCorrect) {
-      newStreak += 1;
-      const scoreBreakdown = calculateScore(
-        true,
-        vote.responseTime || votingTime * 1000,
-        votingTime * 1000,
-        newStreak
-      );
-      points = scoreBreakdown.total;
-    } else {
-      newStreak = 0;
-    }
+    // Simple scoring: 1 point for correct answer
+    const points = isCorrect ? 1 : 0;
 
     // Update vote with results
     const voteId = `${vote.playerId}_${songId}`;
@@ -210,7 +225,6 @@ export const processVotesForSong = async (
     // Update player score
     await updateDoc(doc(db, 'rooms', roomId, 'players', vote.playerId), {
       score: player.score + points,
-      streak: newStreak,
     });
   }
 };

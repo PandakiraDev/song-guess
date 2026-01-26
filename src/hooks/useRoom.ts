@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { useUserStore } from '../store/userStore';
 import {
@@ -27,23 +27,49 @@ export const useRoom = (roomId?: string) => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [roomDeleted, setRoomDeleted] = useState(false);
+  const hadRoomRef = useRef(false);
 
   // Subscribe to room and players when roomId changes
   useEffect(() => {
     if (!roomId) return;
 
-    const unsubRoom = subscribeToRoom(roomId, (roomData) => {
-      if (roomData) {
-        setRoom(roomData);
-      } else {
-        setRoom(null);
-        setError('Room not found or has been deleted');
-      }
-    });
+    // Reset state when subscribing to new room
+    setRoomDeleted(false);
+    hadRoomRef.current = false;
 
-    const unsubPlayers = subscribeToPlayers(roomId, (playersData) => {
-      setPlayers(playersData);
-    });
+    const unsubRoom = subscribeToRoom(
+      roomId,
+      (roomData) => {
+        if (roomData) {
+          setRoom(roomData);
+          hadRoomRef.current = true;
+        } else {
+          setRoom(null);
+          // Only set roomDeleted if we previously had a room (meaning it was deleted)
+          // or if we're trying to access a non-existent room
+          if (hadRoomRef.current) {
+            setRoomDeleted(true);
+            setError('Room has been closed by the host');
+          } else {
+            setError('Room not found');
+          }
+        }
+      },
+      (error) => {
+        setError('Connection error: ' + error.message);
+      }
+    );
+
+    const unsubPlayers = subscribeToPlayers(
+      roomId,
+      (playersData) => {
+        setPlayers(playersData);
+      },
+      (error) => {
+        console.error('Players subscription error:', error);
+      }
+    );
 
     return () => {
       unsubRoom();
@@ -194,6 +220,7 @@ export const useRoom = (roomId?: string) => {
     allPlayersReady,
     isLoading,
     error,
+    roomDeleted,
     createRoom: handleCreateRoom,
     joinRoom: handleJoinRoom,
     updateSettings: handleUpdateSettings,

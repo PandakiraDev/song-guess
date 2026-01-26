@@ -3,13 +3,15 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   FlatList,
   Image,
   ActivityIndicator,
   Alert,
+  ScrollView,
+  Keyboard,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -33,8 +35,9 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
 }) => {
   const { roomId } = route.params;
   const { user } = useAuth();
-  const { room, players, isHost, updateStatus } = useRoom(roomId);
+  const { room, players, isHost, updateStatus, roomDeleted } = useRoom(roomId);
   const {
+    songs,
     mySongs,
     requiredSongsCount,
     hasEnoughSongs,
@@ -49,6 +52,18 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [isAddingSong, setIsAddingSong] = useState(false);
 
+  // Handle room deletion (host left)
+  useEffect(() => {
+    if (roomDeleted) {
+      Alert.alert(
+        'Room Closed',
+        'The host has closed the room.',
+        [{ text: 'OK', onPress: () => navigation.replace('Home') }],
+        { cancelable: false }
+      );
+    }
+  }, [roomDeleted, navigation]);
+
   // Handle room status changes
   useEffect(() => {
     if (room?.status === 'playing') {
@@ -58,6 +73,9 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
+
+    // Hide keyboard so user can easily tap on results
+    Keyboard.dismiss();
 
     setIsSearching(true);
     try {
@@ -79,9 +97,15 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
       return;
     }
 
+    // Validate that the result has required data
+    if (!result.videoId) {
+      Alert.alert('Error', 'Invalid video. Please try a different song.');
+      return;
+    }
+
     setIsAddingSong(true);
     try {
-      await addSong(result.videoId, result.title, result.thumbnail);
+      await addSong(result.videoId, result.title || 'Unknown Song', result.thumbnail || '');
       // Clear from search results
       setSearchResults((prev) =>
         prev.filter((r) => r.videoId !== result.videoId)
@@ -134,14 +158,10 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
     );
   };
 
-  const renderMySong = ({ item, index }: { item: any; index: number }) => (
-    <SongCard song={item} showRemove onRemove={() => handleRemoveSong(item.id)} />
-  );
-
-  // Calculate progress
+  // Calculate progress using all songs (not just mySongs)
   const getPlayerProgress = () => {
     return players.map((player) => {
-      const playerSongCount = mySongs.filter(
+      const playerSongCount = songs.filter(
         (s) => s.addedBy === player.id
       ).length;
       return {
@@ -167,15 +187,18 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
       {/* My Songs Section */}
       {mySongs.length > 0 && (
         <View style={styles.mySongsSection}>
-          <Text style={styles.sectionTitle}>Your Songs</Text>
-          <FlatList
-            data={mySongs}
-            keyExtractor={(item) => item.id}
-            renderItem={renderMySong}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.mySongsList}
-          />
+          <Text style={styles.sectionTitle}>Your Songs ({mySongs.length}/{requiredSongsCount})</Text>
+          <View style={styles.mySongsList}>
+            {mySongs.map((song) => (
+              <View key={song.id} style={styles.mySongItem}>
+                <Image source={{ uri: song.thumbnail }} style={styles.mySongThumbnail} />
+                <Text style={styles.mySongTitle} numberOfLines={1}>{song.title}</Text>
+                <TouchableOpacity onPress={() => handleRemoveSong(song.id)} style={styles.removeSongButton}>
+                  <Ionicons name="close-circle" size={24} color={colors.error} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
         </View>
       )}
 
@@ -203,11 +226,12 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
           {searchResults.length > 0 && (
             <FlatList
               data={searchResults}
-              keyExtractor={(item) => item.videoId}
+              keyExtractor={(item, index) => item.videoId || `search-${index}`}
               renderItem={renderSearchResult}
               style={styles.searchResults}
               contentContainerStyle={styles.searchResultsContent}
               showsVerticalScrollIndicator={false}
+              nestedScrollEnabled={true}
             />
           )}
 
@@ -317,6 +341,28 @@ const styles = StyleSheet.create({
   },
   mySongsList: {
     gap: spacing.sm,
+  },
+  mySongItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
+  },
+  mySongThumbnail: {
+    width: 50,
+    height: 28,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.surface,
+  },
+  mySongTitle: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: fontSize.sm,
+  },
+  removeSongButton: {
+    padding: spacing.xs,
   },
   searchSection: {
     flex: 1,

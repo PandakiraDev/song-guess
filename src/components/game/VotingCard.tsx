@@ -126,11 +126,9 @@ export const VotingCard: React.FC<VotingCardProps> = ({
   revealed = false,
   correctPlayerId,
 }) => {
-  // Filter out the song owner (they can't vote for themselves)
-  // and the current user if they're the owner
-  const votablePlayers = players.filter(
-    (p) => p.id !== currentUserId || p.id === currentSongOwnerId
-  );
+  // Show all players except the current user (you can't vote for yourself)
+  // The current user is also the one viewing this card, so they shouldn't appear as an option
+  const votablePlayers = players.filter((p) => p.id !== currentUserId);
 
   const renderPlayer = (item: Player) => {
     const isSelected = item.id === selectedPlayerId;

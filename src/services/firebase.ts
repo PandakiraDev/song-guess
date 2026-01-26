@@ -1,11 +1,8 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import { getFirestore, Firestore } from 'firebase/firestore';
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 
-// Firebase configuration
-// TODO: Replace with your own Firebase project config
+// Firebase configuration for Firestore (web SDK)
 const firebaseConfig = {
   apiKey: "AIzaSyBLmqXNASLm12qfezmwn-CrHLKYxyG3sTU",
   authDomain: "songguess-4dd30.firebaseapp.com",
@@ -15,20 +12,20 @@ const firebaseConfig = {
   appId: "1:907750033094:web:9689619661915b6d27f9c7"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase app for Firestore (web SDK)
+export const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Auth with persistence
-let auth;
-if (Platform.OS !== 'web') {
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage)
-  });
-} else {
-  auth = getAuth(app);
-}
+// Initialize Firestore (web SDK - works fine)
+export const db: Firestore = getFirestore(app);
 
-// Initialize Firestore
-const db = getFirestore(app);
+// Export native Firebase Auth module
+export const firebaseAuth = auth;
 
-export { app, auth, db };
+// Helper to get current auth instance
+export const getFirebaseAuth = () => auth();
+
+// Helper for Firestore
+export const getFirebaseDb = (): Firestore => db;
+
+// Re-export auth types for convenience
+export type { FirebaseAuthTypes };

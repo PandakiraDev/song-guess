@@ -1,13 +1,13 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   ScrollView,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -26,6 +26,7 @@ type LobbyScreenProps = {
 export const LobbyScreen: React.FC<LobbyScreenProps> = ({ navigation, route }) => {
   const { roomId } = route.params;
   const { user } = useAuth();
+  const isLeavingRef = useRef(false);
   const {
     room,
     players,
@@ -34,6 +35,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ navigation, route }) =
     allPlayersReady,
     isLoading,
     error,
+    roomDeleted,
     updateSettings,
     updateStatus,
     toggleReady,
@@ -47,14 +49,17 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ navigation, route }) =
     }
   }, [room?.status, roomId, navigation]);
 
-  // Handle room deletion
+  // Handle room deletion (host left)
   useEffect(() => {
-    if (!room && !isLoading) {
-      Alert.alert('Room Closed', 'The room has been closed by the host.', [
-        { text: 'OK', onPress: () => navigation.replace('Home') },
-      ]);
+    if (roomDeleted && !isLeavingRef.current) {
+      Alert.alert(
+        'Room Closed',
+        'The room has been closed by the host.',
+        [{ text: 'OK', onPress: () => navigation.replace('Home') }],
+        { cancelable: false }
+      );
     }
-  }, [room, isLoading, navigation]);
+  }, [roomDeleted, navigation]);
 
   const handleLeaveRoom = () => {
     Alert.alert(
@@ -68,6 +73,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ navigation, route }) =
           text: isHost ? 'Close' : 'Leave',
           style: 'destructive',
           onPress: async () => {
+            isLeavingRef.current = true;
             await leaveRoom();
             navigation.replace('Home');
           },

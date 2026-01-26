@@ -175,10 +175,23 @@ export const useGameStore = create<GameState>((set, get) => ({
   // Computed
   getCurrentSong: () => {
     const state = get();
-    if (state.currentSongIndex < 0 || state.currentSongIndex >= state.shuffledSongs.length) {
+    const { room, songs, shuffledSongs, currentSongIndex } = state;
+
+    // Use room's shuffledSongIds if available (synced from Firestore)
+    if (room?.shuffledSongIds && room.shuffledSongIds.length > 0) {
+      const index = room.currentSongIndex >= 0 ? room.currentSongIndex : currentSongIndex;
+      if (index < 0 || index >= room.shuffledSongIds.length) {
+        return null;
+      }
+      const songId = room.shuffledSongIds[index];
+      return songs.find(s => s.id === songId) || null;
+    }
+
+    // Fallback to local shuffledSongs (for host during transition)
+    if (currentSongIndex < 0 || currentSongIndex >= shuffledSongs.length) {
       return null;
     }
-    return state.shuffledSongs[state.currentSongIndex];
+    return shuffledSongs[currentSongIndex];
   },
 
   getPlayerById: (id) => {

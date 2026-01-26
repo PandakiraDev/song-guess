@@ -4,19 +4,13 @@ import { ScoreBreakdown } from '../types';
  * Calculate score for a vote
  *
  * Scoring system:
- * - Base points: 1 point for correct answer
- * - Speed bonus: 0-3 points based on response time
- *   - First 25% of time: +3 points
- *   - 25-50% of time: +2 points
- *   - 50-75% of time: +1 point
- *   - 75-100% of time: +0 points
- * - Streak bonus: +1 point for each consecutive correct answer
+ * - 1 point for correct answer
  */
 export const calculateScore = (
   isCorrect: boolean,
-  responseTimeMs: number,
-  maxTimeMs: number,
-  currentStreak: number
+  _responseTimeMs?: number,
+  _maxTimeMs?: number,
+  _currentStreak?: number
 ): ScoreBreakdown => {
   if (!isCorrect) {
     return {
@@ -27,62 +21,32 @@ export const calculateScore = (
     };
   }
 
-  const basePoints = 1;
-
-  // Calculate speed bonus
-  const timeRatio = responseTimeMs / maxTimeMs;
-  let speedBonus = 0;
-
-  if (timeRatio <= 0.25) {
-    speedBonus = 3;
-  } else if (timeRatio <= 0.5) {
-    speedBonus = 2;
-  } else if (timeRatio <= 0.75) {
-    speedBonus = 1;
-  }
-
-  // Streak bonus: +1 for each consecutive correct (excluding current)
-  // currentStreak includes the current correct answer
-  const streakBonus = Math.max(0, currentStreak - 1);
-
   return {
-    basePoints,
-    speedBonus,
-    streakBonus,
-    total: basePoints + speedBonus + streakBonus,
+    basePoints: 1,
+    speedBonus: 0,
+    streakBonus: 0,
+    total: 1,
   };
 };
 
 /**
- * Get speed bonus description
+ * Decode HTML entities in a string
  */
-export const getSpeedBonusText = (responseTimeMs: number, maxTimeMs: number): string => {
-  const timeRatio = responseTimeMs / maxTimeMs;
+export const decodeHtmlEntities = (text: string): string => {
+  const entities: Record<string, string> = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&apos;': "'",
+    '&#x27;': "'",
+    '&#x2F;': '/',
+    '&#47;': '/',
+    '&nbsp;': ' ',
+  };
 
-  if (timeRatio <= 0.25) {
-    return 'Lightning fast! +3';
-  } else if (timeRatio <= 0.5) {
-    return 'Quick! +2';
-  } else if (timeRatio <= 0.75) {
-    return 'Nice! +1';
-  }
-
-  return '';
-};
-
-/**
- * Get streak description
- */
-export const getStreakText = (streak: number): string => {
-  if (streak >= 5) {
-    return `On fire! ${streak} in a row!`;
-  } else if (streak >= 3) {
-    return `Hot streak! ${streak} in a row!`;
-  } else if (streak >= 2) {
-    return `${streak} in a row!`;
-  }
-
-  return '';
+  return text.replace(/&[#\w]+;/g, (match) => entities[match] || match);
 };
 
 /**
