@@ -38,6 +38,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const hasCalledContentReady = useRef(false);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Use external playing state if provided, otherwise use internal state
   // But only allow external control AFTER content is detected (ads finished)
@@ -49,7 +50,33 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   React.useEffect(() => {
     hasCalledContentReady.current = false;
     setContentDetected(false);
+
+    // Clear any existing timeout
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+    }
   }, [videoId]);
+
+  // Fallback timeout - if content doesn't load in 30 seconds, mark as ready anyway
+  React.useEffect(() => {
+    if (!hasCalledContentReady.current) {
+      loadingTimeoutRef.current = setTimeout(() => {
+        if (!hasCalledContentReady.current) {
+          console.log('YouTubePlayer: Loading timeout, marking as ready');
+          hasCalledContentReady.current = true;
+          setContentDetected(true);
+          setInternalPlaying(false);
+          onContentReady?.();
+        }
+      }, 30000); // 30 second timeout
+    }
+
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
+  }, [videoId, onContentReady]);
 
   const handleReady = useCallback(() => {
     // Seek to start time
@@ -125,11 +152,14 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     [onEnd, onContentReady, startTime, startDurationTracking, contentDetected]
   );
 
-  // Cleanup interval on unmount
+  // Cleanup on unmount
   React.useEffect(() => {
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+      }
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
       }
     };
   }, []);
@@ -144,13 +174,23 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
         videoId={videoId}
         onReady={handleReady}
         onChangeState={handleStateChange}
+        initialPlayerParams={{
+          preventFullScreen: true,
+          modestbranding: true,
+          rel: false,
+          iv_load_policy: 3, // Hide annotations
+        }}
         webViewProps={{
+          androidLayerType: 'hardware', // Better performance on Android
           injectedJavaScript: `
             var element = document.getElementsByClassName('container')[0];
             element.style.position = 'unset';
             element.style.paddingBottom = 'unset';
             true;
           `,
+          mediaPlaybackRequiresUserAction: false,
+          allowsInlineMediaPlayback: true,
+          startInLoadingState: true,
         }}
       />
     </View>

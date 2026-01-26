@@ -1,5 +1,5 @@
 import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp, deleteField } from 'firebase/firestore';
 import { db } from './firebase';
 import { User, GuestUser, AVATARS } from '../types';
 
@@ -139,6 +139,38 @@ export const updateUserStats = async (
     },
     { merge: true }
   );
+};
+
+// Update user profile (displayName, avatar, avatarUrl)
+export const updateUserProfile = async (
+  userId: string,
+  updates: {
+    displayName?: string;
+    avatar?: string;
+    avatarUrl?: string | null;
+  }
+): Promise<void> => {
+  const userRef = doc(db, 'users', userId);
+
+  // Build update object
+  const updateData: Record<string, any> = {};
+
+  if (updates.displayName !== undefined) {
+    updateData.displayName = updates.displayName;
+  }
+
+  if (updates.avatar !== undefined) {
+    updateData.avatar = updates.avatar;
+  }
+
+  if (updates.avatarUrl !== undefined) {
+    // If null, remove the field; otherwise set the URL
+    updateData.avatarUrl = updates.avatarUrl === null ? deleteField() : updates.avatarUrl;
+  }
+
+  if (Object.keys(updateData).length > 0) {
+    await updateDoc(userRef, updateData);
+  }
 };
 
 // Subscribe to auth state changes

@@ -6,6 +6,7 @@ export interface User {
   displayName: string;
   email?: string;
   avatar?: string;
+  avatarUrl?: string; // Firebase Storage URL when avatar === 'custom'
   isGuest: boolean;
   gamesPlayed: number;
   totalWins: number;
@@ -50,6 +51,7 @@ export interface Player {
   id: string;
   name: string;
   avatar: string;
+  avatarUrl?: string; // Firebase Storage URL when avatar === 'custom'
   isHost: boolean;
   score: number;
   streak: number;
@@ -119,6 +121,7 @@ export type RootStackParamList = {
   Game: { roomId: string };
   Results: { roomId: string };
   Profile: undefined;
+  EditProfile: undefined;
   QRScanner: undefined;
 };
 

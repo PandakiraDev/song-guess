@@ -40,6 +40,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
     playbackStarted,
     musicPlaying,
     allPlayersContentReady,
+    hostContentReady,
+    isContentReadyForVoting,
     allPlayersVoted,
     votingActive,
     startPlayback,
@@ -206,8 +208,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
           </View>
         )}
 
-        {/* Song Info - only show after all players finish ads */}
-        {!isRevealing && votingActive && (
+        {/* Song Info - show when voting is active, or in host_only mode when host's ad is done */}
+        {!isRevealing && (votingActive || (room.settings.playbackMode === 'host_only' && hostContentReady)) && (
           <Card style={styles.songInfo}>
             <Ionicons name="musical-note" size={20} color={colors.neonPink} />
             <Text style={styles.songTitle} numberOfLines={1}>
@@ -237,56 +239,76 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
           </Card>
         )}
 
-        {/* Loading status - waiting for all players to finish ads */}
+        {/* Loading status - waiting for content to load */}
         {playbackStarted && !votingActive && !isRevealing && (
           <Card style={styles.loadingStatusCard}>
-            <View style={styles.loadingStatusHeader}>
-              <Ionicons
-                name={allPlayersContentReady ? 'checkmark-circle' : 'sync'}
-                size={24}
-                color={allPlayersContentReady ? colors.success : colors.neonBlue}
-              />
-              <Text style={styles.loadingStatusTitle}>
-                {allPlayersContentReady
-                  ? 'Starting...'
-                  : 'Waiting for players'
-                }
-              </Text>
-              <Text style={styles.loadingStatusCount}>
-                {players.filter(p => p.contentPlaying).length}/{players.length}
-              </Text>
-            </View>
-            <View style={styles.playerStatusList}>
-              {players.map((player) => (
-                <View
-                  key={player.id}
-                  style={[
-                    styles.playerStatusItem,
-                    player.contentPlaying && styles.playerStatusItemReady
-                  ]}
-                >
-                  <View style={styles.playerStatusIcon}>
-                    <Ionicons
-                      name={player.contentPlaying ? 'checkmark' : 'hourglass'}
-                      size={14}
-                      color={player.contentPlaying ? colors.success : colors.warning}
-                    />
-                  </View>
-                  <Text
-                    style={styles.playerStatusName}
-                    numberOfLines={1}
-                  >
-                    {player.name}
+            {room.settings.playbackMode === 'host_only' ? (
+              // Host-only mode: just show waiting for host message
+              <View style={styles.loadingStatusHeader}>
+                <Ionicons
+                  name={hostContentReady ? 'checkmark-circle' : 'sync'}
+                  size={24}
+                  color={hostContentReady ? colors.success : colors.neonBlue}
+                />
+                <Text style={styles.loadingStatusTitle}>
+                  {hostContentReady
+                    ? 'Starting...'
+                    : isHost ? 'Loading video...' : 'Waiting for host...'
+                  }
+                </Text>
+              </View>
+            ) : (
+              // All players mode: show detailed player list
+              <>
+                <View style={styles.loadingStatusHeader}>
+                  <Ionicons
+                    name={allPlayersContentReady ? 'checkmark-circle' : 'sync'}
+                    size={24}
+                    color={allPlayersContentReady ? colors.success : colors.neonBlue}
+                  />
+                  <Text style={styles.loadingStatusTitle}>
+                    {allPlayersContentReady
+                      ? 'Starting...'
+                      : 'Waiting for players'
+                    }
                   </Text>
-                  <Text style={[
-                    styles.playerStatusLabel,
-                    { color: player.contentPlaying ? colors.success : colors.warning }
-                  ]}>
-                    {player.contentPlaying ? 'Ready' : 'Ad'}
+                  <Text style={styles.loadingStatusCount}>
+                    {players.filter(p => p.contentPlaying).length}/{players.length}
                   </Text>
                 </View>
-              ))}
-            </View>
+                <View style={styles.playerStatusList}>
+                  {players.map((player) => (
+                    <View
+                      key={player.id}
+                      style={[
+                        styles.playerStatusItem,
+                        player.contentPlaying && styles.playerStatusItemReady
+                      ]}
+                    >
+                      <View style={styles.playerStatusIcon}>
+                        <Ionicons
+                          name={player.contentPlaying ? 'checkmark' : 'hourglass'}
+                          size={14}
+                          color={player.contentPlaying ? colors.success : colors.warning}
+                        />
+                      </View>
+                      <Text
+                        style={styles.playerStatusName}
+                        numberOfLines={1}
+                      >
+                        {player.name}
+                      </Text>
+                      <Text style={[
+                        styles.playerStatusLabel,
+                        { color: player.contentPlaying ? colors.success : colors.warning }
+                      ]}>
+                        {player.contentPlaying ? 'Ready' : 'Ad'}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
           </Card>
         )}
 

@@ -1,10 +1,88 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../theme/colors';
 import { Player } from '../../types';
 import { Avatar, Card } from '../common';
+
+// Memoized player item component
+interface PlayerItemProps {
+  player: Player;
+  index: number;
+  isHost: boolean;
+  isCurrentUser: boolean;
+  showReady: boolean;
+  showScore: boolean;
+}
+
+const PlayerItem = React.memo<PlayerItemProps>(({
+  player,
+  index,
+  isHost,
+  isCurrentUser,
+  showReady,
+  showScore,
+}) => (
+  <Animated.View
+    entering={FadeInRight.delay(index * 100)}
+    exiting={FadeOutLeft}
+  >
+    <Card
+      style={[
+        styles.playerCard,
+        isCurrentUser && styles.currentUserCard,
+      ]}
+    >
+      <View style={styles.playerInfo}>
+        <Avatar
+          name={player.name}
+          avatarId={player.avatar}
+          avatarUrl={player.avatarUrl}
+          size="medium"
+          showBorder={isHost}
+          borderColor={colors.neonPink}
+        />
+
+        <View style={styles.playerDetails}>
+          <View style={styles.nameRow}>
+            <Text style={styles.playerName}>{player.name}</Text>
+            {isHost && (
+              <View style={styles.hostBadge}>
+                <Ionicons name="star" size={12} color={colors.neonPink} />
+                <Text style={styles.hostText}>Host</Text>
+              </View>
+            )}
+            {isCurrentUser && !isHost && (
+              <Text style={styles.youText}>(You)</Text>
+            )}
+          </View>
+
+          {showScore && (
+            <Text style={styles.score}>{player.score} pts</Text>
+          )}
+        </View>
+      </View>
+
+      {showReady && !isHost && (
+        <View style={styles.readyStatus}>
+          {player.isReady ? (
+            <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+          ) : (
+            <Ionicons name="time-outline" size={24} color={colors.textMuted} />
+          )}
+        </View>
+      )}
+
+      {showScore && player.streak > 1 && (
+        <View style={styles.streakBadge}>
+          <Ionicons name="flame" size={16} color={colors.warning} />
+          <Text style={styles.streakText}>{player.streak}</Text>
+        </View>
+      )}
+    </Card>
+  </Animated.View>
+));
 
 interface PlayerListProps {
   players: Player[];
@@ -21,71 +99,22 @@ export const PlayerList: React.FC<PlayerListProps> = ({
   showScore = false,
   currentUserId,
 }) => {
-  const renderPlayer = (item: Player, index: number) => {
+  const renderPlayer = useCallback((item: Player, index: number) => {
     const isHost = item.id === hostId;
     const isCurrentUser = item.id === currentUserId;
 
     return (
-      <Animated.View
+      <PlayerItem
         key={item.id}
-        entering={FadeInRight.delay(index * 100)}
-        exiting={FadeOutLeft}
-      >
-        <Card
-          style={[
-            styles.playerCard,
-            isCurrentUser && styles.currentUserCard,
-          ]}
-        >
-          <View style={styles.playerInfo}>
-            <Avatar
-              name={item.name}
-              avatarId={item.avatar}
-              size="medium"
-              showBorder={isHost}
-              borderColor={colors.neonPink}
-            />
-
-            <View style={styles.playerDetails}>
-              <View style={styles.nameRow}>
-                <Text style={styles.playerName}>{item.name}</Text>
-                {isHost && (
-                  <View style={styles.hostBadge}>
-                    <Ionicons name="star" size={12} color={colors.neonPink} />
-                    <Text style={styles.hostText}>Host</Text>
-                  </View>
-                )}
-                {isCurrentUser && !isHost && (
-                  <Text style={styles.youText}>(You)</Text>
-                )}
-              </View>
-
-              {showScore && (
-                <Text style={styles.score}>{item.score} pts</Text>
-              )}
-            </View>
-          </View>
-
-          {showReady && !isHost && (
-            <View style={styles.readyStatus}>
-              {item.isReady ? (
-                <Ionicons name="checkmark-circle" size={24} color={colors.success} />
-              ) : (
-                <Ionicons name="time-outline" size={24} color={colors.textMuted} />
-              )}
-            </View>
-          )}
-
-          {showScore && item.streak > 1 && (
-            <View style={styles.streakBadge}>
-              <Ionicons name="flame" size={16} color={colors.warning} />
-              <Text style={styles.streakText}>{item.streak}</Text>
-            </View>
-          )}
-        </Card>
-      </Animated.View>
+        player={item}
+        index={index}
+        isHost={isHost}
+        isCurrentUser={isCurrentUser}
+        showReady={showReady}
+        showScore={showScore}
+      />
     );
-  };
+  }, [hostId, currentUserId, showReady, showScore]);
 
   return (
     <View style={styles.container}>

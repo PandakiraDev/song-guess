@@ -33,6 +33,7 @@ const PodiumPlace: React.FC<{
       <Avatar
         name={player.name}
         avatarId={player.avatar}
+        avatarUrl={player.avatarUrl}
         size={position === 1 ? 'large' : 'medium'}
         showBorder
         borderColor={colors_map[position]}
@@ -114,6 +115,7 @@ export const Scoreboard: React.FC<ScoreboardProps> = ({
           <Avatar
             name={item.name}
             avatarId={item.avatar}
+            avatarUrl={item.avatarUrl}
             size="small"
           />
 

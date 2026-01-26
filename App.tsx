@@ -1,16 +1,21 @@
 // Reanimated must be imported first to initialize native module
 import 'react-native-reanimated';
 
-import React, { useEffect } from 'react';
-import { StatusBar, View, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { StatusBar, StyleSheet, Platform } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as NavigationBar from 'expo-navigation-bar';
+import * as SplashScreenExpo from 'expo-splash-screen';
 import { colors } from './src/theme/colors';
 import { RootStackParamList } from './src/types';
 import { useUserStore } from './src/store/userStore';
+import { SplashScreen } from './src/components/SplashScreen';
+
+// Keep the splash screen visible while we fetch resources
+SplashScreenExpo.preventAutoHideAsync();
 
 // Screens
 import {
@@ -23,6 +28,7 @@ import {
   GameScreen,
   ResultsScreen,
   ProfileScreen,
+  EditProfileScreen,
   QRScannerScreen,
 } from './src/screens';
 
@@ -43,16 +49,11 @@ const DarkTheme = {
   },
 };
 
-// Loading screen while checking auth
-const LoadingScreen = () => (
-  <View style={styles.loadingContainer}>
-    <ActivityIndicator size="large" color={colors.neonPink} />
-    <Text style={styles.loadingText}>Loading...</Text>
-  </View>
-);
-
 export default function App() {
   const { isLoading, loadStoredUser } = useUserStore();
+  const [showSplash, setShowSplash] = useState(true);
+  const [appReady, setAppReady] = useState(false);
+  const [animationComplete, setAnimationComplete] = useState(false);
 
   useEffect(() => {
     loadStoredUser();
@@ -65,12 +66,35 @@ export default function App() {
     }
   }, []);
 
-  if (isLoading) {
+  // Track when loading is complete
+  useEffect(() => {
+    if (!isLoading) {
+      setAppReady(true);
+    }
+  }, [isLoading]);
+
+  // Hide splash when both animation is complete and app is ready
+  useEffect(() => {
+    const hideSplash = async () => {
+      if (appReady && animationComplete) {
+        await SplashScreenExpo.hideAsync();
+        setShowSplash(false);
+      }
+    };
+    hideSplash();
+  }, [appReady, animationComplete]);
+
+  const handleSplashFinish = useCallback(() => {
+    setAnimationComplete(true);
+  }, []);
+
+  // Show animated splash screen
+  if (showSplash) {
     return (
       <GestureHandlerRootView style={styles.container}>
         <SafeAreaProvider>
           <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-          <LoadingScreen />
+          <SplashScreen onFinish={handleSplashFinish} />
         </SafeAreaProvider>
       </GestureHandlerRootView>
     );
@@ -93,6 +117,7 @@ export default function App() {
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="Auth" component={AuthScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
 
             {/* Room Screens */}
             <Stack.Screen name="CreateRoom" component={CreateRoomScreen} />
@@ -127,16 +152,5 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-  },
-  loadingText: {
-    marginTop: 16,
-    color: colors.textSecondary,
-    fontSize: 16,
   },
 });

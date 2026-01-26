@@ -7,4 +7,5 @@ export { AddSongsScreen } from './AddSongsScreen';
 export { GameScreen } from './GameScreen';
 export { ResultsScreen } from './ResultsScreen';
 export { ProfileScreen } from './ProfileScreen';
+export { EditProfileScreen } from './EditProfileScreen';
 export { QRScannerScreen } from './QRScannerScreen';

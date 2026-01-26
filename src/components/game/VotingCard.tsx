@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -35,7 +35,7 @@ interface PlayerOptionProps {
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-const PlayerOption: React.FC<PlayerOptionProps> = ({
+const PlayerOption: React.FC<PlayerOptionProps> = React.memo(({
   player,
   isSelected,
   isRevealed,
@@ -46,35 +46,35 @@ const PlayerOption: React.FC<PlayerOptionProps> = ({
 }) => {
   const scale = useSharedValue(1);
 
-  const handlePress = () => {
+  const handlePress = useCallback(() => {
     scale.value = withSequence(
       withTiming(0.95, { duration: 100 }),
       withSpring(1)
     );
     onPress();
-  };
+  }, [onPress, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  const getBorderColor = () => {
+  const borderColor = useMemo(() => {
     if (isRevealed) {
       if (isCorrect) return colors.success;
       if (isSelected) return colors.error;
     }
     if (isSelected) return colors.neonPink;
     return 'transparent';
-  };
+  }, [isRevealed, isCorrect, isSelected]);
 
-  const getBackgroundColor = () => {
+  const backgroundColor = useMemo(() => {
     if (isRevealed) {
       if (isCorrect) return colors.success + '20';
       if (isSelected) return colors.error + '20';
     }
     if (isSelected) return colors.neonPink + '20';
     return colors.surface;
-  };
+  }, [isRevealed, isCorrect, isSelected]);
 
   return (
     <AnimatedTouchable
@@ -87,8 +87,8 @@ const PlayerOption: React.FC<PlayerOptionProps> = ({
         style={[
           styles.playerOption,
           {
-            borderColor: getBorderColor(),
-            backgroundColor: getBackgroundColor(),
+            borderColor,
+            backgroundColor,
           },
         ]}
       >
@@ -114,7 +114,7 @@ const PlayerOption: React.FC<PlayerOptionProps> = ({
       </View>
     </AnimatedTouchable>
   );
-};
+});
 
 export const VotingCard: React.FC<VotingCardProps> = ({
   players,
@@ -126,11 +126,28 @@ export const VotingCard: React.FC<VotingCardProps> = ({
   revealed = false,
   correctPlayerId,
 }) => {
-  // Show all players except the current user (you can't vote for yourself)
-  // The current user is also the one viewing this card, so they shouldn't appear as an option
-  const votablePlayers = players.filter((p) => p.id !== currentUserId);
+  // Memoize filtered players to avoid recalculation on every render
+  const votablePlayers = useMemo(
+    () => players.filter((p) => p.id !== currentUserId),
+    [players, currentUserId]
+  );
 
-  const renderPlayer = (item: Player) => {
+  // Memoize rows to avoid recalculation
+  const rows = useMemo(() => {
+    const result: Player[][] = [];
+    for (let i = 0; i < votablePlayers.length; i += 2) {
+      result.push(votablePlayers.slice(i, i + 2));
+    }
+    return result;
+  }, [votablePlayers]);
+
+  // Memoize vote handler to provide stable reference
+  const handleVote = useCallback(
+    (playerId: string) => onVote(playerId),
+    [onVote]
+  );
+
+  const renderPlayer = useCallback((item: Player) => {
     const isSelected = item.id === selectedPlayerId;
     const isCorrect = revealed && item.id === correctPlayerId;
     const wasSelectedCorrectly = isSelected && isCorrect;
@@ -143,17 +160,11 @@ export const VotingCard: React.FC<VotingCardProps> = ({
         isRevealed={revealed}
         isCorrect={isCorrect}
         wasSelectedCorrectly={wasSelectedCorrectly}
-        onPress={() => onVote(item.id)}
+        onPress={() => handleVote(item.id)}
         disabled={disabled || revealed}
       />
     );
-  };
-
-  // Create rows of 2 players each
-  const rows: Player[][] = [];
-  for (let i = 0; i < votablePlayers.length; i += 2) {
-    rows.push(votablePlayers.slice(i, i + 2));
-  }
+  }, [selectedPlayerId, revealed, correctPlayerId, handleVote, disabled]);
 
   return (
     <Card style={styles.container}>

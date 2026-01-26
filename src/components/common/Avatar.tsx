@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, ViewStyle, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../theme/colors';
 import { AVATAR_EMOJIS } from '../../types';
@@ -7,6 +7,7 @@ import { AVATAR_EMOJIS } from '../../types';
 interface AvatarProps {
   name: string;
   avatarId?: string;
+  avatarUrl?: string; // Firebase Storage URL for custom avatars
   size?: 'small' | 'medium' | 'large' | 'xlarge';
   style?: ViewStyle;
   showBorder?: boolean;
@@ -16,6 +17,7 @@ interface AvatarProps {
 export const Avatar: React.FC<AvatarProps> = ({
   name,
   avatarId,
+  avatarUrl,
   size = 'medium',
   style,
   showBorder = false,
@@ -38,27 +40,51 @@ export const Avatar: React.FC<AvatarProps> = ({
   const dimension = sizeMap[size];
   const textSize = fontSizeMap[size];
 
+  // Check if using custom avatar with URL
+  const isCustomAvatar = avatarId === 'custom' && avatarUrl;
+
   // Get emoji from avatar ID or use first letter of name
   const displayContent = avatarId && AVATAR_EMOJIS[avatarId]
     ? AVATAR_EMOJIS[avatarId]
     : name.charAt(0).toUpperCase();
 
+  const containerStyle = [
+    styles.container,
+    {
+      width: dimension,
+      height: dimension,
+      borderRadius: dimension / 2,
+    },
+    showBorder && {
+      borderWidth: 2,
+      borderColor,
+    },
+    style,
+  ];
+
+  // Render custom avatar image
+  if (isCustomAvatar) {
+    return (
+      <View style={containerStyle}>
+        <Image
+          source={{ uri: avatarUrl }}
+          style={[
+            styles.customImage,
+            {
+              width: dimension - (showBorder ? 4 : 0),
+              height: dimension - (showBorder ? 4 : 0),
+              borderRadius: (dimension - (showBorder ? 4 : 0)) / 2,
+            },
+          ]}
+          resizeMode="cover"
+        />
+      </View>
+    );
+  }
+
+  // Render predefined emoji avatar
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          width: dimension,
-          height: dimension,
-          borderRadius: dimension / 2,
-        },
-        showBorder && {
-          borderWidth: 2,
-          borderColor,
-        },
-        style,
-      ]}
-    >
+    <View style={containerStyle}>
       <LinearGradient
         colors={[colors.neonPurple, colors.neonBlue]}
         start={{ x: 0, y: 0 }}
@@ -91,6 +117,9 @@ const styles = StyleSheet.create({
   text: {
     color: colors.textPrimary,
     fontWeight: fontWeight.bold,
+  },
+  customImage: {
+    backgroundColor: colors.surface,
   },
 });
 

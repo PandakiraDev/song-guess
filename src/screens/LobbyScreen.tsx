@@ -188,12 +188,17 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ navigation, route }) =
             onPress={handleStartGame}
             size="large"
             fullWidth
-            disabled={players.length < 2}
+            disabled={players.length < 2 || !allPlayersReady}
             icon={<Ionicons name="play" size={24} color={colors.textPrimary} />}
           />
           {players.length < 2 && (
             <Text style={styles.minPlayersText}>
               Need at least 2 players to start
+            </Text>
+          )}
+          {players.length >= 2 && !allPlayersReady && (
+            <Text style={styles.minPlayersText}>
+              Waiting for all players to be ready
             </Text>
           )}
         </View>

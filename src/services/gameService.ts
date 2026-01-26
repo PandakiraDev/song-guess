@@ -11,6 +11,7 @@ import {
   where,
   serverTimestamp,
   Timestamp,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Song, Vote, Player } from '../types';
@@ -197,14 +198,22 @@ export const subscribeToVotes = (
 };
 
 // Process votes after reveal and update scores
+// Accepts votes parameter to avoid redundant Firestore query
 export const processVotesForSong = async (
   roomId: string,
   songId: string,
   correctPlayerId: string,
   _votingTime: number,
-  players: Player[]
+  players: Player[],
+  existingVotes?: Vote[]
 ): Promise<void> => {
-  const votes = await getVotesForSong(roomId, songId);
+  // Use existing votes if provided, otherwise fetch (for backwards compatibility)
+  const votes = existingVotes
+    ? existingVotes.filter(v => v.songId === songId)
+    : await getVotesForSong(roomId, songId);
+
+  // Use batch write for atomic, more efficient multi-document update
+  const batch = writeBatch(db);
 
   for (const vote of votes) {
     const isCorrect = vote.votedFor === correctPlayerId;
@@ -217,16 +226,18 @@ export const processVotesForSong = async (
 
     // Update vote with results
     const voteId = `${vote.playerId}_${songId}`;
-    await updateDoc(doc(db, 'rooms', roomId, 'votes', voteId), {
+    batch.update(doc(db, 'rooms', roomId, 'votes', voteId), {
       correct: isCorrect,
       points,
     });
 
     // Update player score
-    await updateDoc(doc(db, 'rooms', roomId, 'players', vote.playerId), {
+    batch.update(doc(db, 'rooms', roomId, 'players', vote.playerId), {
       score: player.score + points,
     });
   }
+
+  await batch.commit();
 };
 
 // Get game results
@@ -247,35 +258,39 @@ export const getGameResults = async (
   };
 };
 
-// Reset game for replay
+// Reset game for replay using batch writes for better performance
 export const resetGameForReplay = async (roomId: string): Promise<void> => {
+  const batch = writeBatch(db);
+
   // Reset all players' scores and streaks
   const playersSnapshot = await getDocs(collection(db, 'rooms', roomId, 'players'));
-  for (const playerDoc of playersSnapshot.docs) {
-    await updateDoc(playerDoc.ref, {
+  playersSnapshot.docs.forEach((playerDoc) => {
+    batch.update(playerDoc.ref, {
       score: 0,
       streak: 0,
       isReady: false,
     });
-  }
+  });
 
   // Delete all votes
   const votesSnapshot = await getDocs(collection(db, 'rooms', roomId, 'votes'));
-  for (const voteDoc of votesSnapshot.docs) {
-    await deleteDoc(voteDoc.ref);
-  }
+  votesSnapshot.docs.forEach((voteDoc) => {
+    batch.delete(voteDoc.ref);
+  });
 
   // Reset all songs to unplayed
   const songsSnapshot = await getDocs(collection(db, 'rooms', roomId, 'songs'));
-  for (const songDoc of songsSnapshot.docs) {
-    await updateDoc(songDoc.ref, {
+  songsSnapshot.docs.forEach((songDoc) => {
+    batch.update(songDoc.ref, {
       played: false,
     });
-  }
+  });
 
   // Reset room status and song index
-  await updateDoc(doc(db, 'rooms', roomId), {
+  batch.update(doc(db, 'rooms', roomId), {
     status: 'lobby',
     currentSongIndex: -1,
   });
+
+  await batch.commit();
 };

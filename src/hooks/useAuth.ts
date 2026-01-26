@@ -49,6 +49,9 @@ export const useAuth = () => {
         const userData = await signUpWithEmail(email, password, displayName);
         setUser(userData);
         return userData;
+      } catch (error) {
+        // Re-throw the error so it can be caught by the caller
+        throw error;
       } finally {
         setLoading(false);
       }
@@ -66,6 +69,9 @@ export const useAuth = () => {
           setUser(userData);
         }
         return userData;
+      } catch (error) {
+        // Re-throw the error so it can be caught by the caller
+        throw error;
       } finally {
         setLoading(false);
       }

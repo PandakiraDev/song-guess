@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -94,14 +94,21 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
     transform: [{ scale: confettiScale.value }],
   }));
 
-  const rankedPlayers = getRankedPlayers(players);
+  // Memoize computed values to avoid recalculation on every render
+  const rankedPlayers = useMemo(() => getRankedPlayers(players), [players]);
   const winner = rankedPlayers[0];
-  const currentUserRank = rankedPlayers.find((p) => p.id === user?.id)?.rank || 0;
+  const currentUserRank = useMemo(
+    () => rankedPlayers.find((p) => p.id === user?.id)?.rank || 0,
+    [rankedPlayers, user?.id]
+  );
 
-  // Calculate stats
-  const totalCorrectGuesses = votes.filter((v) => v.correct).length;
-  const totalVotes = votes.length;
-  const accuracy = totalVotes > 0 ? Math.round((totalCorrectGuesses / totalVotes) * 100) : 0;
+  // Calculate stats - memoized
+  const gameStats = useMemo(() => {
+    const totalCorrectGuesses = votes.filter((v) => v.correct).length;
+    const totalVotes = votes.length;
+    const accuracy = totalVotes > 0 ? Math.round((totalCorrectGuesses / totalVotes) * 100) : 0;
+    return { totalCorrectGuesses, totalVotes, accuracy };
+  }, [votes]);
 
   const handlePlayAgain = async () => {
     await playAgain();
@@ -216,11 +223,11 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
                 <Text style={styles.statLabel}>Players</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{accuracy}%</Text>
+                <Text style={styles.statValue}>{gameStats.accuracy}%</Text>
                 <Text style={styles.statLabel}>Accuracy</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{totalCorrectGuesses}</Text>
+                <Text style={styles.statValue}>{gameStats.totalCorrectGuesses}</Text>
                 <Text style={styles.statLabel}>Correct</Text>
               </View>
             </View>

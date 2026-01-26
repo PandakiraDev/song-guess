@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { useUserStore } from '../store/userStore';
 import {
@@ -12,7 +12,7 @@ import {
   removePlayerFromRoom,
   deleteRoom,
 } from '../services/roomService';
-import { RoomSettings, RoomStatus } from '../types';
+import { RoomSettings, RoomStatus, User } from '../types';
 
 export const useRoom = (roomId?: string) => {
   const { user } = useUserStore();
@@ -88,10 +88,12 @@ export const useRoom = (roomId?: string) => {
     setError(null);
 
     try {
+      const avatarUrl = !user.isGuest ? (user as User).avatarUrl : undefined;
       const newRoom = await createRoom(
         user.id,
         user.displayName,
-        'avatar' in user ? user.avatar : 'avatar_1'
+        user.avatar || 'avatar_1',
+        avatarUrl
       );
       setRoom(newRoom);
       return newRoom;
@@ -115,11 +117,13 @@ export const useRoom = (roomId?: string) => {
       setError(null);
 
       try {
+        const avatarUrl = !user.isGuest ? (user as User).avatarUrl : undefined;
         const joinedRoom = await joinRoomByCode(
           code,
           user.id,
           user.displayName,
-          'avatar' in user ? user.avatar : 'avatar_1'
+          user.avatar || 'avatar_1',
+          avatarUrl
         );
         if (joinedRoom) {
           setRoom(joinedRoom);
@@ -203,14 +207,21 @@ export const useRoom = (roomId?: string) => {
     }
   }, [room, user, leaveRoom]);
 
-  // Check if current user is host
-  const isHost = room && user ? room.hostId === user.id : false;
+  // Memoized computed properties to avoid recalculation on every render
+  const isHost = useMemo(
+    () => room && user ? room.hostId === user.id : false,
+    [room, user]
+  );
 
-  // Get current player
-  const currentPlayer = user ? players.find((p) => p.id === user.id) : undefined;
+  const currentPlayer = useMemo(
+    () => user ? players.find((p) => p.id === user.id) : undefined,
+    [user, players]
+  );
 
-  // Check if all players are ready
-  const allPlayersReady = players.length > 0 && players.every((p) => p.isHost || p.isReady);
+  const allPlayersReady = useMemo(
+    () => players.length > 0 && players.every((p) => p.isHost || p.isReady),
+    [players]
+  );
 
   return {
     room,

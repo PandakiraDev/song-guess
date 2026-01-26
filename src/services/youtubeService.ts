@@ -4,13 +4,27 @@ import { YouTubeSearchResult, HeatmapMarker } from '../types';
 // TODO: Replace with your YouTube Data API v3 key
 const YOUTUBE_API_KEY = 'AIzaSyD2xTrw7tW41AiiRLr-3vi6QWc2WaSSmus';
 
-// Search YouTube for videos
+// Cache for search results (reduces API calls)
+const searchCache = new Map<string, { results: YouTubeSearchResult[]; timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Cache for video details
+const videoDetailsCache = new Map<string, { duration: number; title: string; thumbnail: string; timestamp: number }>();
+
+// Search YouTube for videos (with caching)
 export const searchYouTube = async (query: string): Promise<YouTubeSearchResult[]> => {
+  const cacheKey = query.toLowerCase().trim();
+  const cached = searchCache.get(cacheKey);
+
+  // Return cached results if still valid
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.results;
+  }
+
   try {
-    // Note: Removed videoCategoryId=10 filter to allow finding all videos,
-    // not just those officially categorized as "Music" on YouTube
+    // Reduced maxResults to 5 to save API quota
     const response = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=15&q=${encodeURIComponent(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=5&q=${encodeURIComponent(
         query
       )}&type=video&key=${YOUTUBE_API_KEY}`
     );
@@ -21,7 +35,7 @@ export const searchYouTube = async (query: string): Promise<YouTubeSearchResult[
 
     const data = await response.json();
 
-    return data.items
+    const results = data.items
       .filter((item: any) => item.id?.videoId && item.snippet?.title)
       .map((item: any) => ({
         videoId: item.id.videoId,
@@ -29,18 +43,33 @@ export const searchYouTube = async (query: string): Promise<YouTubeSearchResult[
         thumbnail: item.snippet.thumbnails?.medium?.url || '',
         channelTitle: item.snippet.channelTitle || '',
       }));
+
+    // Cache the results
+    searchCache.set(cacheKey, { results, timestamp: Date.now() });
+
+    return results;
   } catch (error) {
     console.error('YouTube search error:', error);
     throw error;
   }
 };
 
-// Get video details (including duration)
+// Get video details (including duration) - with caching
 export const getVideoDetails = async (videoId: string): Promise<{
   duration: number;
   title: string;
   thumbnail: string;
 }> => {
+  // Check cache first
+  const cached = videoDetailsCache.get(videoId);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return {
+      duration: cached.duration,
+      title: cached.title,
+      thumbnail: cached.thumbnail,
+    };
+  }
+
   try {
     const response = await fetch(
       `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`
@@ -58,12 +87,13 @@ export const getVideoDetails = async (videoId: string): Promise<{
 
     const video = data.items[0];
     const duration = parseDuration(video.contentDetails.duration);
+    const title = video.snippet.title;
+    const thumbnail = video.snippet.thumbnails.medium.url;
 
-    return {
-      duration,
-      title: video.snippet.title,
-      thumbnail: video.snippet.thumbnails.medium.url,
-    };
+    // Cache the result
+    videoDetailsCache.set(videoId, { duration, title, thumbnail, timestamp: Date.now() });
+
+    return { duration, title, thumbnail };
   } catch (error) {
     console.error('Get video details error:', error);
     throw error;
@@ -141,15 +171,10 @@ export const estimatePeakTime = (duration: number): number => {
 };
 
 // Get the best start time for a video
-export const getBestStartTime = async (videoId: string, duration: number): Promise<number> => {
-  // First, try to get the "Most Replayed" timestamp
-  const mostReplayed = await getMostReplayedTimestamp(videoId);
-
-  if (mostReplayed !== null && mostReplayed > 0 && mostReplayed < duration - 30) {
-    return mostReplayed;
-  }
-
-  // Fallback to estimated peak time
+// Simplified: just use estimated peak time (faster, no extra network request)
+export const getBestStartTime = async (_videoId: string, duration: number): Promise<number> => {
+  // Use estimated peak time based on duration
+  // Skipping heatmap fetch as it's slow and unreliable
   return estimatePeakTime(duration);
 };
 

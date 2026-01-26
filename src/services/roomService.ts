@@ -11,6 +11,7 @@ import {
   where,
   serverTimestamp,
   Timestamp,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Room, RoomSettings, Player, RoomStatus } from '../types';
@@ -30,11 +31,16 @@ export const defaultRoomSettings: RoomSettings = {
   songsPerPlayer: 2,
   playbackDuration: 30,
   votingTime: 15,
-  playbackMode: 'host_only',
+  playbackMode: 'all_players',
 };
 
 // Create a new room
-export const createRoom = async (hostId: string, hostName: string, hostAvatar: string): Promise<Room> => {
+export const createRoom = async (
+  hostId: string,
+  hostName: string,
+  hostAvatar: string,
+  hostAvatarUrl?: string
+): Promise<Room> => {
   const roomId = generateRoomId();
   let code = generateRoomCode();
 
@@ -64,7 +70,7 @@ export const createRoom = async (hostId: string, hostName: string, hostAvatar: s
   await setDoc(doc(db, 'rooms', roomId), room);
 
   // Add host as first player
-  await addPlayerToRoom(roomId, hostId, hostName, hostAvatar, true);
+  await addPlayerToRoom(roomId, hostId, hostName, hostAvatar, true, hostAvatarUrl);
 
   return {
     id: roomId,
@@ -107,7 +113,8 @@ export const joinRoomByCode = async (
   code: string,
   playerId: string,
   playerName: string,
-  playerAvatar: string
+  playerAvatar: string,
+  playerAvatarUrl?: string
 ): Promise<Room | null> => {
   const room = await getRoomByCode(code);
 
@@ -126,7 +133,7 @@ export const joinRoomByCode = async (
     return room;
   }
 
-  await addPlayerToRoom(room.id, playerId, playerName, playerAvatar, false);
+  await addPlayerToRoom(room.id, playerId, playerName, playerAvatar, false, playerAvatarUrl);
 
   return room;
 };
@@ -137,11 +144,13 @@ export const addPlayerToRoom = async (
   playerId: string,
   name: string,
   avatar: string,
-  isHost: boolean
+  isHost: boolean,
+  avatarUrl?: string
 ): Promise<void> => {
   const player: Omit<Player, 'id'> = {
     name: name,
     avatar: avatar,
+    avatarUrl: avatarUrl,
     isHost,
     score: 0,
     streak: 0,
@@ -276,15 +285,18 @@ export const updatePlayerReadyForSong = async (
   });
 };
 
-// Reset all players' readyForSong status
+// Reset all players' readyForSong status using batch write for better performance
 export const resetAllPlayersReadyForSong = async (
   roomId: string
 ): Promise<void> => {
   const playersSnapshot = await getDocs(collection(db, 'rooms', roomId, 'players'));
-  const updates = playersSnapshot.docs.map((playerDoc) =>
-    updateDoc(playerDoc.ref, { readyForSong: false, contentPlaying: false })
-  );
-  await Promise.all(updates);
+
+  // Use batch write for atomic, more efficient multi-document update
+  const batch = writeBatch(db);
+  playersSnapshot.docs.forEach((playerDoc) => {
+    batch.update(playerDoc.ref, { readyForSong: false, contentPlaying: false });
+  });
+  await batch.commit();
 };
 
 // Update player's contentPlaying status (actual music playing after ads)

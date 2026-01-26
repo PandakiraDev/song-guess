@@ -58,17 +58,27 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
       }
     } catch (err: any) {
       console.error('Login error:', err);
-      const errorMessage = err?.message || 'Login failed. Please try again.';
-      if (errorMessage.includes('auth/invalid-credential')) {
+      // Firebase errors have a 'code' property
+      const errorCode = err?.code || '';
+      const errorMessage = err?.message || '';
+
+      if (errorCode === 'auth/invalid-credential' || errorCode === 'auth/wrong-password') {
         setError('Invalid email or password');
-      } else if (errorMessage.includes('auth/user-not-found')) {
+      } else if (errorCode === 'auth/user-not-found') {
         setError('No account found with this email');
-      } else if (errorMessage.includes('auth/wrong-password')) {
-        setError('Incorrect password');
-      } else if (errorMessage.includes('auth/invalid-email')) {
+      } else if (errorCode === 'auth/invalid-email') {
         setError('Invalid email address');
+      } else if (errorCode === 'auth/too-many-requests') {
+        setError('Too many failed attempts. Please try again later.');
+      } else if (errorCode === 'auth/network-request-failed') {
+        setError('Network error. Please check your connection.');
+      } else if (errorMessage.includes('invalid-credential') || errorMessage.includes('wrong-password')) {
+        // Fallback: check message string
+        setError('Invalid email or password');
+      } else if (errorMessage.includes('user-not-found')) {
+        setError('No account found with this email');
       } else {
-        setError(errorMessage);
+        setError('Login failed. Please check your credentials and try again.');
       }
     }
   };
@@ -99,17 +109,24 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
       }
     } catch (err: any) {
       console.error('Registration error:', err);
-      const errorMessage = err?.message || 'Registration failed. Please try again.';
-      if (errorMessage.includes('auth/email-already-in-use')) {
+      // Firebase errors have a 'code' property
+      const errorCode = err?.code || '';
+      const errorMessage = err?.message || '';
+
+      if (errorCode === 'auth/email-already-in-use') {
         setError('This email is already registered');
-      } else if (errorMessage.includes('auth/invalid-email')) {
+      } else if (errorCode === 'auth/invalid-email') {
         setError('Invalid email address');
-      } else if (errorMessage.includes('auth/weak-password')) {
-        setError('Password is too weak');
+      } else if (errorCode === 'auth/weak-password') {
+        setError('Password is too weak. Use at least 6 characters.');
+      } else if (errorCode === 'auth/network-request-failed') {
+        setError('Network error. Please check your connection.');
+      } else if (errorMessage.includes('email-already-in-use')) {
+        setError('This email is already registered');
       } else if (errorMessage.includes('permission')) {
         setError('Database error. Please contact support.');
       } else {
-        setError(errorMessage);
+        setError('Registration failed. Please try again.');
       }
     }
   };

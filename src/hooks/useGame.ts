@@ -1,4 +1,6 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useMemo } from 'react';
+import { updateDoc, doc } from 'firebase/firestore';
+import { db } from '../services/firebase';
 import { useGameStore } from '../store/gameStore';
 import { useUserStore } from '../store/userStore';
 import {
@@ -19,7 +21,7 @@ import {
   resetAllPlayersReadyForSong,
   updatePlayerContentPlaying,
 } from '../services/roomService';
-import { Song } from '../types';
+import { Song, Vote } from '../types';
 
 export const useGame = (roomId?: string) => {
   const { user } = useUserStore();
@@ -127,8 +129,6 @@ export const useGame = (roomId?: string) => {
       await resetAllPlayersReadyForSong(roomId);
 
       // Update room with shuffled order and status
-      const { updateDoc, doc } = await import('firebase/firestore');
-      const { db } = await import('../services/firebase');
       await updateDoc(doc(db, 'rooms', roomId), {
         shuffledSongIds: shuffledIds,
         currentSongIndex: 0,
@@ -181,8 +181,6 @@ export const useGame = (roomId?: string) => {
 
     // Sync voting state to Firestore so all clients know voting has started
     try {
-      const { updateDoc, doc } = await import('firebase/firestore');
-      const { db } = await import('../services/firebase');
       await updateDoc(doc(db, 'rooms', roomId), {
         votingActive: true
       });
@@ -209,23 +207,22 @@ export const useGame = (roomId?: string) => {
     // Mark song as played
     await markSongAsPlayed(roomId, currentSong.id);
 
-    // Process votes and update scores
+    // Process votes and update scores - pass existing votes to avoid redundant query
     await processVotesForSong(
       roomId,
       currentSong.id,
       currentSong.addedBy,
       room.settings.votingTime,
-      players
+      players,
+      votes
     );
 
     // Update room status to 'reveal' and reset votingActive - this syncs across all clients
-    const { updateDoc, doc } = await import('firebase/firestore');
-    const { db } = await import('../services/firebase');
     await updateDoc(doc(db, 'rooms', roomId), {
       status: 'reveal',
       votingActive: false
     });
-  }, [roomId, room, user, players, getCurrentSong]);
+  }, [roomId, room, user, players, votes, getCurrentSong]);
 
   // Move to next song
   const handleNextSong = useCallback(async () => {
@@ -246,8 +243,6 @@ export const useGame = (roomId?: string) => {
       await updateRoomStatus(roomId, 'finished');
     } else {
       // Move to next song and set status back to playing
-      const { updateDoc, doc } = await import('firebase/firestore');
-      const { db } = await import('../services/firebase');
       await updateDoc(doc(db, 'rooms', roomId), {
         currentSongIndex: nextIndex,
         status: 'playing',
@@ -288,8 +283,6 @@ export const useGame = (roomId?: string) => {
     if (!roomId || !room || !user || room.hostId !== user.id) return;
 
     try {
-      const { updateDoc, doc } = await import('firebase/firestore');
-      const { db } = await import('../services/firebase');
       await updateDoc(doc(db, 'rooms', roomId), {
         playbackStarted: true,
         votingActive: false, // Will be set to true when all players' content is playing
@@ -315,8 +308,6 @@ export const useGame = (roomId?: string) => {
     if (!roomId || !room || !user || room.hostId !== user.id) return;
 
     try {
-      const { updateDoc, doc } = await import('firebase/firestore');
-      const { db } = await import('../services/firebase');
       await updateDoc(doc(db, 'rooms', roomId), {
         musicPlaying: true,
         votingActive: true,
@@ -327,12 +318,19 @@ export const useGame = (roomId?: string) => {
     }
   }, [roomId, room, user, setVotingStartTime]);
 
+  // Memoized computed properties to avoid recalculation on every render
+
   // Check if all players are ready for the current song (video loaded)
-  const allPlayersReadyForSong = players.length > 0 &&
-    players.every((player) => player.readyForSong === true);
+  const allPlayersReadyForSong = useMemo(
+    () => players.length > 0 && players.every((player) => player.readyForSong === true),
+    [players]
+  );
 
   // Check if current player is ready for song
-  const isReadyForSong = user ? players.find(p => p.id === user.id)?.readyForSong === true : false;
+  const isReadyForSong = useMemo(
+    () => user ? players.find(p => p.id === user.id)?.readyForSong === true : false,
+    [user, players]
+  );
 
   // Playback started state from room (video player rendered, ads may play)
   const playbackStarted = room?.playbackStarted || false;
@@ -341,47 +339,69 @@ export const useGame = (roomId?: string) => {
   const musicPlaying = room?.musicPlaying || false;
 
   // Check if all players' content is ready (paused at start, waiting for sync)
-  const allPlayersContentReady = players.length > 0 &&
-    players.every((player) => player.contentPlaying === true);
+  const allPlayersContentReady = useMemo(
+    () => players.length > 0 && players.every((player) => player.contentPlaying === true),
+    [players]
+  );
+
+  // Check if host's content is ready (for host_only mode)
+  const hostContentReady = useMemo(
+    () => room?.hostId ? players.find((p) => p.id === room.hostId)?.contentPlaying === true : false,
+    [room?.hostId, players]
+  );
+
+  // Determine if content is ready based on playback mode
+  const isContentReadyForVoting = useMemo(
+    () => room?.settings.playbackMode === 'host_only' ? hostContentReady : allPlayersContentReady,
+    [room?.settings.playbackMode, hostContentReady, allPlayersContentReady]
+  );
 
   // Voting active state from room
   const votingActive = room?.votingActive || false;
 
   // Get songs added by current user
-  const mySongs = user ? songs.filter((s) => s.addedBy === user.id) : [];
+  const mySongs = useMemo(
+    () => user ? songs.filter((s) => s.addedBy === user.id) : [],
+    [user, songs]
+  );
 
   // Get required songs count
   const requiredSongsCount = room?.settings.songsPerPlayer || 2;
 
   // Check if current user has added enough songs
-  const hasEnoughSongs = mySongs.length >= requiredSongsCount;
+  const hasEnoughSongs = useMemo(
+    () => mySongs.length >= requiredSongsCount,
+    [mySongs.length, requiredSongsCount]
+  );
 
   // Check if all players have added enough songs
-  const allPlayersHaveEnoughSongs =
-    players.length > 0 &&
-    players.every((player) => {
+  const allPlayersHaveEnoughSongs = useMemo(
+    () => players.length > 0 && players.every((player) => {
       const playerSongs = songs.filter((s) => s.addedBy === player.id);
       return playerSongs.length >= requiredSongsCount;
-    });
+    }),
+    [players, songs, requiredSongsCount]
+  );
 
   // Get the current song
   const currentSong = getCurrentSong();
 
   // Get vote count for current song
-  const currentSongVoteCount = currentSong
-    ? votes.filter((v) => v.songId === currentSong.id).length
-    : 0;
+  const currentSongVoteCount = useMemo(
+    () => currentSong ? votes.filter((v) => v.songId === currentSong.id).length : 0,
+    [currentSong, votes]
+  );
 
   // Check if all players have voted (except the song owner)
-  const playersWhoNeedToVote = currentSong
-    ? players.filter((p) => p.id !== currentSong.addedBy).length
-    : 0;
-  const allPlayersVoted =
-    currentSong &&
-    playersWhoNeedToVote > 0 &&
-    currentSongVoteCount >= playersWhoNeedToVote;
+  const allPlayersVoted = useMemo(() => {
+    if (!currentSong) return false;
+    const playersWhoNeedToVote = players.filter((p) => p.id !== currentSong.addedBy).length;
+    return playersWhoNeedToVote > 0 && currentSongVoteCount >= playersWhoNeedToVote;
+  }, [currentSong, players, currentSongVoteCount]);
 
-  // Auto-start voting when all players' content is ready (after ads)
+  // Auto-start voting when content is ready (after ads)
+  // For 'all_players' mode: wait for all players to finish ads
+  // For 'host_only' mode: only wait for host to finish ads
   useEffect(() => {
     const autoStartVoting = async () => {
       if (!roomId || !room || !user) return;
@@ -389,11 +409,9 @@ export const useGame = (roomId?: string) => {
       if (!playbackStarted) return; // Videos must be loading
       if (musicPlaying) return; // Already playing
       if (votingActive) return; // Voting already active
-      if (!allPlayersContentReady) return; // Wait for all players to finish ads
+      if (!isContentReadyForVoting) return; // Wait based on playback mode
 
       try {
-        const { updateDoc, doc } = await import('firebase/firestore');
-        const { db } = await import('../services/firebase');
         await updateDoc(doc(db, 'rooms', roomId), {
           musicPlaying: true,
           votingActive: true,
@@ -405,7 +423,7 @@ export const useGame = (roomId?: string) => {
     };
 
     autoStartVoting();
-  }, [roomId, room, user, playbackStarted, musicPlaying, votingActive, allPlayersContentReady, setVotingStartTime]);
+  }, [roomId, room, user, playbackStarted, musicPlaying, votingActive, isContentReadyForVoting, setVotingStartTime]);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -443,6 +461,8 @@ export const useGame = (roomId?: string) => {
     playbackStarted,
     musicPlaying,
     allPlayersContentReady,
+    hostContentReady,
+    isContentReadyForVoting,
     votingActive,
     addSong: handleAddSong,
     removeSong: handleRemoveSong,

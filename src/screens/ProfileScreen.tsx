@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
-import { RootStackParamList } from '../types';
+import { RootStackParamList, User } from '../types';
 import { Button, Card, Avatar } from '../components/common';
 import { useAuth } from '../hooks/useAuth';
 
@@ -86,6 +86,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           <Avatar
             name={user.displayName}
             avatarId={'avatar' in user ? user.avatar : undefined}
+            avatarUrl={'avatarUrl' in user ? (user as User).avatarUrl : undefined}
             size="xlarge"
             showBorder
             borderColor={colors.neonPink}
@@ -96,7 +97,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               <Text style={styles.guestBadgeText}>Guest</Text>
             </View>
           ) : (
-            <Text style={styles.userEmail}>{(user as any).email}</Text>
+            <Text style={styles.userEmail}>{(user as User).email}</Text>
+          )}
+          {/* Edit Profile Button - only for registered users */}
+          {!isGuest && (
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={() => navigation.navigate('EditProfile')}
+            >
+              <Ionicons name="pencil" size={16} color={colors.neonPink} />
+              <Text style={styles.editButtonText}>Edit Profile</Text>
+            </TouchableOpacity>
           )}
         </Card>
 
@@ -212,6 +223,21 @@ const styles = StyleSheet.create({
   },
   guestBadgeText: {
     color: colors.neonPurple,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.neonPink + '20',
+    borderRadius: borderRadius.round,
+  },
+  editButtonText: {
+    color: colors.neonPink,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
   },
