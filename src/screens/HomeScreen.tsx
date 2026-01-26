@@ -1,10 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { colors, spacing, fontSize, fontWeight } from '../theme/colors';
+import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
 import { RootStackParamList } from '../types';
 import { Button, Avatar } from '../components/common';
 import { useAuth } from '../hooks/useAuth';
@@ -39,27 +39,57 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         style={styles.gradient}
       >
         {/* Header */}
-        <View style={styles.header}>
-          {user ? (
-            <View style={styles.userInfo}>
-              <Avatar
-                name={user.displayName}
-                avatarId={'avatar' in user ? user.avatar : undefined}
-                size="small"
-              />
-              <Text style={styles.userName}>{user.displayName}</Text>
-            </View>
-          ) : (
-            <View />
-          )}
+        <TouchableOpacity
+          style={styles.header}
+          onPress={handleProfile}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={[colors.surface, colors.card]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerGradient}
+          >
+            <View style={styles.userSection}>
+              {user ? (
+                <Avatar
+                  name={user.displayName}
+                  avatarId={'avatar' in user ? user.avatar : undefined}
+                  size="medium"
+                  showBorder
+                  borderColor={user.isGuest ? colors.textMuted : colors.neonPink}
+                />
+              ) : (
+                <View style={styles.guestAvatarPlaceholder}>
+                  <Ionicons name="person" size={24} color={colors.textMuted} />
+                </View>
+              )}
 
-          <Button
-            title=""
-            variant="ghost"
-            onPress={handleProfile}
-            icon={<Ionicons name="person-circle" size={28} color={colors.neonBlue} />}
-          />
-        </View>
+              <View style={styles.userTextContainer}>
+                <Text style={styles.userName} numberOfLines={1}>
+                  {user ? user.displayName : 'Not signed in'}
+                </Text>
+                <View style={styles.statusRow}>
+                  <View style={[
+                    styles.statusDot,
+                    { backgroundColor: user && !user.isGuest ? colors.neonGreen : colors.textMuted }
+                  ]} />
+                  <Text style={styles.userStatus}>
+                    {user ? (user.isGuest ? 'Guest' : 'Signed in') : 'Tap to sign in'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.headerArrow}>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
 
         {/* Logo/Title */}
         <View style={styles.titleContainer}>
@@ -135,20 +165,64 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
+    marginTop: spacing.sm,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.neonPurple + '30',
   },
-  userInfo: {
+  headerGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    justifyContent: 'space-between',
+    padding: spacing.md,
+  },
+  userSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    flex: 1,
+  },
+  guestAvatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.textMuted,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userTextContainer: {
+    flex: 1,
   },
   userName: {
     color: colors.textPrimary,
     fontSize: fontSize.md,
-    fontWeight: fontWeight.medium,
+    fontWeight: fontWeight.semibold,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: 2,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  userStatus: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+  },
+  headerArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.neonPurple + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   titleContainer: {
     alignItems: 'center',

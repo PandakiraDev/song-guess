@@ -14,15 +14,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import * as ImagePicker from 'expo-image-picker';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
 import { RootStackParamList, User } from '../types';
 import { Card } from '../components/common';
-import { AvatarSelector, ImageCropPicker } from '../components/profile';
+import { AvatarSelector } from '../components/profile';
 import { useAuth } from '../hooks/useAuth';
 import { useUserStore } from '../store/userStore';
 import { updateUserProfile } from '../services/authService';
-import { uploadAvatar } from '../services/storageService';
 
 type EditProfileScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'EditProfile'>;
@@ -39,14 +37,9 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
   const [selectedAvatar, setSelectedAvatar] = useState(
     (user && 'avatar' in user ? user.avatar : 'avatar_1') || 'avatar_1'
   );
-  const [customAvatarUrl, setCustomAvatarUrl] = useState<string | undefined>(
-    user && 'avatarUrl' in user ? (user as User).avatarUrl : undefined
-  );
-  const [pendingImageUri, setPendingImageUri] = useState<string | null>(null);
 
   // UI state
   const [isSaving, setIsSaving] = useState(false);
-  const [showCropper, setShowCropper] = useState(false);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
 
   // Check if anything changed
@@ -54,64 +47,16 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
     if (!user) return false;
     const originalNickname = user.displayName;
     const originalAvatar = 'avatar' in user ? user.avatar : 'avatar_1';
-    const originalAvatarUrl = 'avatarUrl' in user ? (user as User).avatarUrl : undefined;
 
     return (
       nickname.trim() !== originalNickname ||
-      selectedAvatar !== originalAvatar ||
-      customAvatarUrl !== originalAvatarUrl
+      selectedAvatar !== originalAvatar
     );
-  }, [user, nickname, selectedAvatar, customAvatarUrl]);
+  }, [user, nickname, selectedAvatar]);
 
   // Handle predefined avatar selection
   const handleSelectPredefined = (avatarId: string) => {
     setSelectedAvatar(avatarId);
-    // Don't clear customAvatarUrl so user can switch back
-  };
-
-  // Handle custom photo selection
-  const handleSelectCustom = async () => {
-    // If already has custom avatar, just select it
-    if (customAvatarUrl && selectedAvatar !== 'custom') {
-      setSelectedAvatar('custom');
-      return;
-    }
-
-    // Request permission
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permission Required',
-        'Please allow access to your photo library to upload a custom avatar.'
-      );
-      return;
-    }
-
-    // Pick image
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false, // We use custom cropper
-      quality: 1,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      setPendingImageUri(result.assets[0].uri);
-      setShowCropper(true);
-    }
-  };
-
-  // Handle crop confirmation
-  const handleCropConfirm = (croppedUri: string) => {
-    setShowCropper(false);
-    setCustomAvatarUrl(croppedUri);
-    setSelectedAvatar('custom');
-    setPendingImageUri(null);
-  };
-
-  // Handle crop cancel
-  const handleCropCancel = () => {
-    setShowCropper(false);
-    setPendingImageUri(null);
   };
 
   // Validate nickname
@@ -140,19 +85,10 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
 
     setIsSaving(true);
     try {
-      let finalAvatarUrl = customAvatarUrl;
-
-      // Upload new custom avatar if it's a local file
-      if (selectedAvatar === 'custom' && customAvatarUrl && !customAvatarUrl.startsWith('http')) {
-        const { url } = await uploadAvatar(user.id, customAvatarUrl);
-        finalAvatarUrl = url;
-      }
-
       // Update Firestore
       await updateUserProfile(user.id, {
         displayName: nickname.trim(),
         avatar: selectedAvatar,
-        avatarUrl: selectedAvatar === 'custom' ? finalAvatarUrl : null,
       });
 
       // Update local store
@@ -160,7 +96,6 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
         ...user,
         displayName: nickname.trim(),
         avatar: selectedAvatar,
-        avatarUrl: selectedAvatar === 'custom' ? finalAvatarUrl : undefined,
       } as User);
 
       navigation.goBack();
@@ -261,23 +196,11 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
           <Card style={styles.section}>
             <AvatarSelector
               currentAvatar={selectedAvatar}
-              currentAvatarUrl={customAvatarUrl}
               onSelectPredefined={handleSelectPredefined}
-              onSelectCustom={handleSelectCustom}
               disabled={isSaving}
             />
           </Card>
         </ScrollView>
-
-        {/* Image Cropper Modal */}
-        {pendingImageUri && (
-          <ImageCropPicker
-            visible={showCropper}
-            imageUri={pendingImageUri}
-            onConfirm={handleCropConfirm}
-            onCancel={handleCropCancel}
-          />
-        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

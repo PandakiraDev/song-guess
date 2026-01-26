@@ -147,18 +147,22 @@ export const addPlayerToRoom = async (
   isHost: boolean,
   avatarUrl?: string
 ): Promise<void> => {
-  const player: Omit<Player, 'id'> = {
+  const player: Record<string, any> = {
     name: name,
     avatar: avatar,
-    avatarUrl: avatarUrl,
     isHost,
     score: 0,
     streak: 0,
-    joinedAt: serverTimestamp() as Timestamp,
+    joinedAt: serverTimestamp(),
     isReady: false,
     readyForSong: false,
     contentPlaying: false,
   };
+
+  // Only include avatarUrl if it's defined (Firestore doesn't accept undefined)
+  if (avatarUrl) {
+    player.avatarUrl = avatarUrl;
+  }
 
   await setDoc(doc(db, 'rooms', roomId, 'players', playerId), player);
 };
