@@ -14,6 +14,7 @@ interface YouTubePlayerProps {
   autoPlay?: boolean;
   playing?: boolean; // External control for play state (true = play, false = pause)
   height?: number;
+  muted?: boolean; // Mute during ad detection
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -31,6 +32,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   autoPlay = true,
   playing: externalPlaying,
   height = PLAYER_HEIGHT,
+  muted = false,
 }) => {
   const playerRef = useRef<YoutubeIframeRef>(null);
   const [internalPlaying, setInternalPlaying] = useState(autoPlay);
@@ -39,6 +41,9 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   const startTimeRef = useRef<number | null>(null);
   const hasCalledContentReady = useRef(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const adCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const playingStateCount = useRef(0);
+  const lastTimeCheck = useRef(0);
 
   // Use external playing state if provided, otherwise use internal state
   // But only allow external control AFTER content is detected (ads finished)
@@ -50,14 +55,63 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   React.useEffect(() => {
     hasCalledContentReady.current = false;
     setContentDetected(false);
+    playingStateCount.current = 0;
+    lastTimeCheck.current = 0;
 
-    // Clear any existing timeout
+    // Clear any existing intervals/timeouts
     if (loadingTimeoutRef.current) {
       clearTimeout(loadingTimeoutRef.current);
     }
+    if (adCheckIntervalRef.current) {
+      clearInterval(adCheckIntervalRef.current);
+    }
   }, [videoId]);
 
-  // Fallback timeout - if content doesn't load in 30 seconds, mark as ready anyway
+  // Start ad detection polling when video starts
+  const startAdDetection = useCallback(() => {
+    if (adCheckIntervalRef.current) {
+      clearInterval(adCheckIntervalRef.current);
+    }
+
+    // Poll every 500ms to check if we're past ads
+    adCheckIntervalRef.current = setInterval(async () => {
+      if (hasCalledContentReady.current) {
+        if (adCheckIntervalRef.current) {
+          clearInterval(adCheckIntervalRef.current);
+        }
+        return;
+      }
+
+      try {
+        const currentTime = await playerRef.current?.getCurrentTime();
+        if (currentTime === undefined) return;
+
+        // Check if time is progressing normally (not stuck at 0 or jumping around like ads)
+        const timeDiff = currentTime - lastTimeCheck.current;
+        lastTimeCheck.current = currentTime;
+
+        // If we're at or past our start time and time is progressing normally
+        // This means actual content is playing, not an ad
+        if (currentTime >= Math.max(0, startTime - 2) && timeDiff > 0 && timeDiff < 2) {
+          // Content is playing - pause and notify
+          hasCalledContentReady.current = true;
+          setContentDetected(true);
+          setInternalPlaying(false);
+
+          if (adCheckIntervalRef.current) {
+            clearInterval(adCheckIntervalRef.current);
+          }
+
+          console.log('YouTubePlayer: Content detected at time', currentTime);
+          onContentReady?.();
+        }
+      } catch (error) {
+        // Ignore errors during polling
+      }
+    }, 500);
+  }, [startTime, onContentReady]);
+
+  // Fallback timeout - if content doesn't load in 25 seconds, mark as ready anyway
   React.useEffect(() => {
     if (!hasCalledContentReady.current) {
       loadingTimeoutRef.current = setTimeout(() => {
@@ -66,9 +120,14 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           hasCalledContentReady.current = true;
           setContentDetected(true);
           setInternalPlaying(false);
+
+          if (adCheckIntervalRef.current) {
+            clearInterval(adCheckIntervalRef.current);
+          }
+
           onContentReady?.();
         }
-      }, 30000); // 30 second timeout
+      }, 25000); // 25 second timeout
     }
 
     return () => {
@@ -84,7 +143,10 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
       playerRef.current?.seekTo(startTime, true);
     }
     onReady?.();
-  }, [startTime, onReady]);
+
+    // Start ad detection polling
+    startAdDetection();
+  }, [startTime, onReady, startAdDetection]);
 
   // Start duration tracking only when actual content is playing (after ads)
   const startDurationTracking = useCallback(() => {
@@ -122,34 +184,26 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
 
   const handleStateChange = useCallback(
     (state: string) => {
+      console.log('YouTubePlayer: State changed to', state);
+
       if (state === 'ended') {
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
         onEnd?.();
       }
-      // When video actually starts playing (after any ads), pause and notify parent
-      if (state === 'playing' && !hasCalledContentReady.current) {
-        // Check current time to confirm it's the actual video, not an ad
-        playerRef.current?.getCurrentTime().then((time) => {
-          // If we're at or near our start time, the actual video is playing (not ad)
-          // Ads typically play from time 0, our video starts at startTime
-          if (time >= startTime - 1 && !hasCalledContentReady.current) {
-            hasCalledContentReady.current = true;
-            setContentDetected(true);
-            // Pause immediately - we'll resume when host triggers sync start
-            setInternalPlaying(false);
-            // Notify parent that content is ready (paused at start)
-            onContentReady?.();
-          }
-        });
+
+      // Track playing state changes
+      if (state === 'playing') {
+        playingStateCount.current += 1;
       }
+
       // Start duration tracking when we resume after content ready
       if (state === 'playing' && contentDetected && !startTimeRef.current) {
         startDurationTracking();
       }
     },
-    [onEnd, onContentReady, startTime, startDurationTracking, contentDetected]
+    [onEnd, startDurationTracking, contentDetected]
   );
 
   // Cleanup on unmount
@@ -160,6 +214,9 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
       }
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
+      }
+      if (adCheckIntervalRef.current) {
+        clearInterval(adCheckIntervalRef.current);
       }
     };
   }, []);

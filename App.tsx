@@ -2,13 +2,22 @@
 import 'react-native-reanimated';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { StatusBar, StyleSheet, Platform } from 'react-native';
+import { StatusBar, StyleSheet, Platform, LogBox } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as SplashScreenExpo from 'expo-splash-screen';
+
+// Suppress known warnings that can't be fixed
+LogBox.ignoreLogs([
+  // Firebase RN uses namespaced API by design, migration to modular is optional
+  'This method is deprecated',
+  // expo-navigation-bar warnings when edge-to-edge is enabled
+  '`setBehaviorAsync` is not supported',
+  '`setBackgroundColorAsync` is not supported',
+]);
 import { colors } from './src/theme/colors';
 import { RootStackParamList } from './src/types';
 import { useUserStore } from './src/store/userStore';
@@ -60,9 +69,9 @@ export default function App() {
 
     // Hide navigation bar on Android for immersive experience
     if (Platform.OS === 'android') {
-      NavigationBar.setVisibilityAsync('hidden');
-      NavigationBar.setBehaviorAsync('overlay-swipe');
-      NavigationBar.setBackgroundColorAsync(colors.background);
+      NavigationBar.setVisibilityAsync('hidden').catch(() => {});
+      NavigationBar.setBehaviorAsync('overlay-swipe').catch(() => {});
+      NavigationBar.setBackgroundColorAsync(colors.background).catch(() => {});
     }
   }, []);
 

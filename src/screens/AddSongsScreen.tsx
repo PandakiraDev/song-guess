@@ -24,6 +24,50 @@ import { useGame } from '../hooks/useGame';
 import { useAuth } from '../hooks/useAuth';
 import { searchYouTube } from '../services/youtubeService';
 
+// Test songs for development (no API needed)
+const TEST_SONGS = [
+  {
+    videoId: 'dQw4w9WgXcQ',
+    title: 'Rick Astley - Never Gonna Give You Up',
+    thumbnail: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
+  },
+  {
+    videoId: '9bZkp7q19f0',
+    title: 'PSY - GANGNAM STYLE',
+    thumbnail: 'https://img.youtube.com/vi/9bZkp7q19f0/mqdefault.jpg',
+  },
+  {
+    videoId: 'kJQP7kiw5Fk',
+    title: 'Luis Fonsi - Despacito ft. Daddy Yankee',
+    thumbnail: 'https://img.youtube.com/vi/kJQP7kiw5Fk/mqdefault.jpg',
+  },
+  {
+    videoId: 'JGwWNGJdvx8',
+    title: 'Ed Sheeran - Shape of You',
+    thumbnail: 'https://img.youtube.com/vi/JGwWNGJdvx8/mqdefault.jpg',
+  },
+  {
+    videoId: 'RgKAFK5djSk',
+    title: 'Wiz Khalifa - See You Again ft. Charlie Puth',
+    thumbnail: 'https://img.youtube.com/vi/RgKAFK5djSk/mqdefault.jpg',
+  },
+  {
+    videoId: 'fJ9rUzIMcZQ',
+    title: 'Queen - Bohemian Rhapsody',
+    thumbnail: 'https://img.youtube.com/vi/fJ9rUzIMcZQ/mqdefault.jpg',
+  },
+  {
+    videoId: 'hTWKbfoikeg',
+    title: 'Nirvana - Smells Like Teen Spirit',
+    thumbnail: 'https://img.youtube.com/vi/hTWKbfoikeg/mqdefault.jpg',
+  },
+  {
+    videoId: 'YQHsXMglC9A',
+    title: 'Adele - Hello',
+    thumbnail: 'https://img.youtube.com/vi/YQHsXMglC9A/mqdefault.jpg',
+  },
+];
+
 type AddSongsScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'AddSongs'>;
   route: RouteProp<RootStackParamList, 'AddSongs'>;
@@ -51,6 +95,7 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
   const [searchResults, setSearchResults] = useState<YouTubeSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isAddingSong, setIsAddingSong] = useState(false);
+  const [isAddingTestSongs, setIsAddingTestSongs] = useState(false);
 
   // Handle room deletion (host left)
   useEffect(() => {
@@ -119,6 +164,32 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
 
   const handleRemoveSong = async (songId: string) => {
     await removeSong(songId);
+  };
+
+  // Add test songs (for development without YouTube API)
+  const handleAddTestSongs = async () => {
+    const songsNeeded = requiredSongsCount - mySongs.length;
+    if (songsNeeded <= 0) return;
+
+    // Filter out songs already added by this user
+    const availableSongs = TEST_SONGS.filter(
+      (testSong) => !mySongs.some((s) => s.youtubeId === testSong.videoId)
+    );
+
+    // Shuffle available songs to get random ones
+    const shuffled = [...availableSongs].sort(() => Math.random() - 0.5);
+    const songsToAdd = shuffled.slice(0, songsNeeded);
+
+    setIsAddingTestSongs(true);
+    try {
+      for (const song of songsToAdd) {
+        await addSong(song.videoId, song.title, song.thumbnail);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to add test songs.');
+    } finally {
+      setIsAddingTestSongs(false);
+    }
   };
 
   const handleStartGame = async () => {
@@ -221,6 +292,22 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
               disabled={!searchQuery.trim()}
             />
           </View>
+
+          {/* Test Songs Button (for development) */}
+          <TouchableOpacity
+            style={styles.testSongsButton}
+            onPress={handleAddTestSongs}
+            disabled={isAddingTestSongs}
+          >
+            {isAddingTestSongs ? (
+              <ActivityIndicator color={colors.neonBlue} size="small" />
+            ) : (
+              <Ionicons name="flask" size={18} color={colors.neonBlue} />
+            )}
+            <Text style={styles.testSongsText}>
+              {isAddingTestSongs ? 'Adding...' : 'Add Test Songs (Dev)'}
+            </Text>
+          </TouchableOpacity>
 
           {/* Search Results */}
           {searchResults.length > 0 && (
@@ -376,6 +463,24 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     marginBottom: 0,
+  },
+  testSongsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.sm,
+    backgroundColor: colors.neonBlue + '15',
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.neonBlue + '30',
+    borderStyle: 'dashed',
+  },
+  testSongsText: {
+    color: colors.neonBlue,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
   },
   searchResults: {
     flex: 1,
