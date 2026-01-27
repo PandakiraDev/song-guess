@@ -22,14 +22,16 @@ export interface GuestUser {
 }
 
 // Room Types
-export type RoomStatus = 'lobby' | 'adding_songs' | 'playing' | 'reveal' | 'finished';
+export type RoomStatus = 'lobby' | 'adding_songs' | 'downloading' | 'playing' | 'reveal' | 'finished';
 export type PlaybackMode = 'host_only' | 'all_players';
+export type AudioSource = 'youtube' | 'stream'; // youtube = with ads, stream = ad-free via yt-dlp
 
 export interface RoomSettings {
   songsPerPlayer: number;
   playbackDuration: number; // in seconds: 30, 60, or 0 for full song
   votingTime: number; // in seconds
   playbackMode: PlaybackMode;
+  audioSource: AudioSource; // youtube = YouTube player (with ads), stream = yt-dlp streaming (ad-free)
 }
 
 export interface Room {
@@ -40,6 +42,7 @@ export interface Room {
   settings: RoomSettings;
   currentSongIndex: number;
   shuffledSongIds?: string[]; // Song IDs in shuffled order for the game
+  audioStreamUrls?: Record<string, string>; // songId -> streaming URL (synced from host)
   votingActive?: boolean; // Whether voting is currently active (synced across clients)
   playbackStarted?: boolean; // Whether video player should render (ads may play)
   musicPlaying?: boolean; // Whether actual music should play (after all ready, synced start)
@@ -118,6 +121,7 @@ export type RootStackParamList = {
   JoinRoom: { code?: string };
   Lobby: { roomId: string };
   AddSongs: { roomId: string };
+  Download: { roomId: string };
   Game: { roomId: string };
   Results: { roomId: string };
   Profile: undefined;

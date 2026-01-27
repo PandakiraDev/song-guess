@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Room, Player, Song, Vote, RoomSettings, RoomStatus } from '../types';
+import { DownloadProgress } from '../services/audioDownloadService';
 
 interface GameState {
   // Room state
@@ -7,6 +8,10 @@ interface GameState {
   players: Player[];
   songs: Song[];
   votes: Vote[];
+
+  // Download state
+  downloadProgress: Map<string, DownloadProgress>;
+  audioUris: Map<string, string>; // songId -> localUri
 
   // Game state
   currentSongIndex: number;
@@ -45,6 +50,11 @@ interface GameState {
   setRoundResults: (results: { playerId: string; correct: boolean; points: number }[]) => void;
   endReveal: () => void;
 
+  // Actions - Download
+  setDownloadProgress: (progress: Map<string, DownloadProgress>) => void;
+  setAudioUri: (songId: string, uri: string) => void;
+  clearDownloads: () => void;
+
   // Actions - Reset
   resetGame: () => void;
   leaveRoom: () => void;
@@ -63,6 +73,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   players: [],
   songs: [],
   votes: [],
+  downloadProgress: new Map(),
+  audioUris: new Map(),
   currentSongIndex: -1,
   shuffledSongs: [],
   isPlaying: false,
@@ -133,6 +145,22 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   setRoundResults: (roundResults) => set({ roundResults }),
 
+  // Download actions
+  setDownloadProgress: (downloadProgress) => set({ downloadProgress: new Map(downloadProgress) }),
+
+  setAudioUri: (songId, uri) =>
+    set((state) => {
+      const newUris = new Map(state.audioUris);
+      newUris.set(songId, uri);
+      return { audioUris: newUris };
+    }),
+
+  clearDownloads: () =>
+    set({
+      downloadProgress: new Map(),
+      audioUris: new Map(),
+    }),
+
   endReveal: () =>
     set({
       isRevealing: false,
@@ -153,6 +181,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       revealedSong: null,
       roundResults: [],
       votes: [],
+      downloadProgress: new Map(),
+      audioUris: new Map(),
     }),
 
   leaveRoom: () =>
@@ -161,6 +191,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       players: [],
       songs: [],
       votes: [],
+      downloadProgress: new Map(),
+      audioUris: new Map(),
       currentSongIndex: -1,
       shuffledSongs: [],
       isPlaying: false,
@@ -218,3 +250,5 @@ export const usePlayers = () => useGameStore((state) => state.players);
 export const useSongs = () => useGameStore((state) => state.songs);
 export const useCurrentSong = () => useGameStore((state) => state.getCurrentSong());
 export const useIsRevealing = () => useGameStore((state) => state.isRevealing);
+export const useDownloadProgress = () => useGameStore((state) => state.downloadProgress);
+export const useAudioUris = () => useGameStore((state) => state.audioUris);

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../theme/colors';
-import { RoomSettings as RoomSettingsType, PlaybackMode } from '../../types';
+import { RoomSettings as RoomSettingsType, PlaybackMode, AudioSource } from '../../types';
 import { Card } from '../common';
 
 interface RoomSettingsProps {
@@ -65,6 +65,10 @@ export const RoomSettingsComponent: React.FC<RoomSettingsProps> = ({
   const playbackModeOptions: { label: string; value: PlaybackMode; icon: string }[] = [
     { label: 'Host Only', value: 'host_only', icon: 'person' },
     { label: 'All Players', value: 'all_players', icon: 'people' },
+  ];
+  const audioSourceOptions: { label: string; value: AudioSource; icon: string; description: string }[] = [
+    { label: 'YouTube', value: 'youtube', icon: 'logo-youtube', description: 'Standard (may have ads)' },
+    { label: 'Stream', value: 'stream', icon: 'cloud-download', description: 'Ad-free (requires server)' },
   ];
 
   return (
@@ -168,6 +172,50 @@ export const RoomSettingsComponent: React.FC<RoomSettingsProps> = ({
           ))}
         </View>
       </View>
+
+      {/* Audio source */}
+      <View style={styles.settingGroup}>
+        <View style={styles.settingHeader}>
+          <Ionicons name="musical-note" size={20} color={colors.neonBlue} />
+          <Text style={styles.settingLabel}>Audio source</Text>
+        </View>
+        <View style={styles.optionsRow}>
+          {audioSourceOptions.map((option) => (
+            <TouchableOpacity
+              key={option.value}
+              onPress={() => onUpdate({ audioSource: option.value })}
+              disabled={disabled}
+              style={[
+                styles.sourceButton,
+                settings.audioSource === option.value && styles.sourceButtonSelected,
+                disabled && styles.optionButtonDisabled,
+              ]}
+            >
+              <Ionicons
+                name={option.icon as any}
+                size={20}
+                color={
+                  settings.audioSource === option.value
+                    ? colors.neonBlue
+                    : colors.textSecondary
+                }
+              />
+              <View style={styles.sourceTextContainer}>
+                <Text
+                  style={[
+                    styles.modeText,
+                    settings.audioSource === option.value && styles.sourceTextSelected,
+                    disabled && styles.optionTextDisabled,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+                <Text style={styles.sourceDescription}>{option.description}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
     </Card>
   );
 };
@@ -250,6 +298,33 @@ const styles = StyleSheet.create({
   },
   modeTextSelected: {
     color: colors.textPrimary,
+  },
+  sourceButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  sourceButtonSelected: {
+    backgroundColor: colors.neonBlue + '20',
+    borderColor: colors.neonBlue,
+  },
+  sourceTextContainer: {
+    flex: 1,
+  },
+  sourceTextSelected: {
+    color: colors.neonBlue,
+  },
+  sourceDescription: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    marginTop: 2,
   },
 });
 

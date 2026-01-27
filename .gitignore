@@ -48,3 +48,18 @@ logs
 
 # EAS
 .eas/
+
+# Firebase config (contains API keys)
+google-services.json
+GoogleService-Info.plist
+
+# Screenshots
+*.png
+*.jpg
+!assets/*.png
+
+# Claude Code
+.claude/
+
+# Windows artifacts
+nul

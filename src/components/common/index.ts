@@ -3,3 +3,4 @@ export { Input } from './Input';
 export { Card } from './Card';
 export { Avatar } from './Avatar';
 export { Timer } from './Timer';
+export { ServerSettingsModal } from './ServerSettingsModal';

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
 import { RootStackParamList } from '../types';
-import { Button, Avatar } from '../components/common';
+import { Button, Avatar, ServerSettingsModal } from '../components/common';
 import { useAuth } from '../hooks/useAuth';
 
 type HomeScreenProps = {
@@ -15,6 +15,7 @@ type HomeScreenProps = {
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { user, signOut } = useAuth();
+  const [showServerSettings, setShowServerSettings] = useState(false);
 
   const handleCreateRoom = () => {
     navigation.navigate('CreateRoom');
@@ -38,6 +39,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         colors={[colors.background, colors.surface]}
         style={styles.gradient}
       >
+        {/* Top Bar with Settings */}
+        <View style={styles.topBar}>
+          <View style={styles.topBarSpacer} />
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={() => setShowServerSettings(true)}
+          >
+            <Ionicons name="server-outline" size={22} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
         {/* Header */}
         <TouchableOpacity
           style={styles.header}
@@ -151,6 +163,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
       </LinearGradient>
+
+      {/* Server Settings Modal */}
+      <ServerSettingsModal
+        visible={showServerSettings}
+        onClose={() => setShowServerSettings(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -163,6 +181,25 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
     paddingHorizontal: spacing.lg,
+  },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: spacing.xs,
+  },
+  topBarSpacer: {
+    width: 40,
+  },
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.surfaceLight,
   },
   header: {
     marginTop: spacing.sm,

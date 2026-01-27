@@ -116,7 +116,7 @@ export const useGame = (roomId?: string) => {
     [roomId]
   );
 
-  // Start the game (host only)
+  // Start the game (host only) - goes to downloading phase first if audioSource is 'stream'
   const handleStartGame = useCallback(async () => {
     if (!roomId || !room || !user || room.hostId !== user.id) return;
 
@@ -128,11 +128,16 @@ export const useGame = (roomId?: string) => {
       // Reset all players' readyForSong status for the first round
       await resetAllPlayersReadyForSong(roomId);
 
+      // Determine the initial status based on audio source setting
+      // 'stream' mode needs to download/fetch streaming URLs first
+      // 'youtube' mode goes directly to playing
+      const initialStatus = room.settings.audioSource === 'stream' ? 'downloading' : 'playing';
+
       // Update room with shuffled order and status
       await updateDoc(doc(db, 'rooms', roomId), {
         shuffledSongIds: shuffledIds,
         currentSongIndex: 0,
-        status: 'playing',
+        status: initialStatus,
         playbackStarted: false,
         musicPlaying: false,
         votingActive: false,

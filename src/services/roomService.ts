@@ -32,6 +32,7 @@ export const defaultRoomSettings: RoomSettings = {
   playbackDuration: 30,
   votingTime: 15,
   playbackMode: 'all_players',
+  audioSource: 'youtube',
 };
 
 // Create a new room
@@ -325,6 +326,14 @@ export const updatePlayerScore = async (
     score,
     streak,
   });
+};
+
+// Update audio stream URLs (for streaming mode - host syncs URLs to all players)
+export const updateAudioStreamUrls = async (
+  roomId: string,
+  audioStreamUrls: Record<string, string>
+): Promise<void> => {
+  await updateDoc(doc(db, 'rooms', roomId), { audioStreamUrls });
 };
 
 // Delete room

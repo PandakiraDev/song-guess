@@ -4,6 +4,7 @@ export { CreateRoomScreen } from './CreateRoomScreen';
 export { JoinRoomScreen } from './JoinRoomScreen';
 export { LobbyScreen } from './LobbyScreen';
 export { AddSongsScreen } from './AddSongsScreen';
+export { DownloadScreen } from './DownloadScreen';
 export { GameScreen } from './GameScreen';
 export { ResultsScreen } from './ResultsScreen';
 export { ProfileScreen } from './ProfileScreen';

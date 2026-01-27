@@ -111,7 +111,9 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
 
   // Handle room status changes
   useEffect(() => {
-    if (room?.status === 'playing') {
+    if (room?.status === 'downloading') {
+      navigation.replace('Download', { roomId });
+    } else if (room?.status === 'playing') {
       navigation.replace('Game', { roomId });
     }
   }, [room?.status, roomId, navigation]);

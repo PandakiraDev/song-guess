@@ -34,6 +34,7 @@ import {
   JoinRoomScreen,
   LobbyScreen,
   AddSongsScreen,
+  DownloadScreen,
   GameScreen,
   ResultsScreen,
   ProfileScreen,
@@ -136,6 +137,13 @@ export default function App() {
 
             {/* Game Screens */}
             <Stack.Screen name="AddSongs" component={AddSongsScreen} />
+            <Stack.Screen
+              name="Download"
+              component={DownloadScreen}
+              options={{
+                gestureEnabled: false,
+              }}
+            />
             <Stack.Screen
               name="Game"
               component={GameScreen}

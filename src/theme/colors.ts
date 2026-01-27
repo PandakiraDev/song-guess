@@ -2,6 +2,7 @@ export const colors = {
   // Tło
   background: '#0a0a0f',
   surface: '#1a1a2e',
+  surfaceLight: '#2a2a4e',
   card: '#16213e',
 
   // Neony

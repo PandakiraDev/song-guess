@@ -28,6 +28,7 @@ import { useAuth } from '../hooks/useAuth';
 import { getRankedPlayers, decodeHtmlEntities } from '../utils/scoring';
 import { updateUserStats, getUserData } from '../services/authService';
 import { useUserStore } from '../store/userStore';
+import { clearAudioCache } from '../services/audioDownloadService';
 
 type ResultsScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Results'>;
@@ -111,6 +112,8 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
   }, [votes]);
 
   const handlePlayAgain = async () => {
+    // Clear audio cache for fresh start
+    await clearAudioCache();
     await playAgain();
     navigation.replace('Lobby', { roomId });
   };
@@ -128,6 +131,8 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
           style: 'destructive',
           onPress: async () => {
             isLeavingRef.current = true;
+            // Clear audio cache when leaving
+            await clearAudioCache();
             await leaveRoom();
             navigation.replace('Home');
           },
@@ -136,7 +141,9 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
     );
   };
 
-  const handleGoHome = () => {
+  const handleGoHome = async () => {
+    // Clear audio cache when leaving
+    await clearAudioCache();
     navigation.replace('Home');
   };
 

@@ -18,7 +18,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.songguess.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "SongGuess needs camera access to scan QR codes for joining game rooms."
+        "NSCameraUsageDescription": "SongGuess needs camera access to scan QR codes for joining game rooms.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

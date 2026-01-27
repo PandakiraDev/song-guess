@@ -13,10 +13,11 @@ import { RouteProp } from '@react-navigation/native';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../theme/colors';
 import { RootStackParamList } from '../types';
 import { Button, Card, Timer } from '../components/common';
-import { YouTubePlayer, VotingCard, RevealAnimation } from '../components/game';
+import { YouTubePlayer, AudioPlayer, VotingCard, RevealAnimation } from '../components/game';
 import { useRoom } from '../hooks/useRoom';
 import { useGame } from '../hooks/useGame';
 import { useAuth } from '../hooks/useAuth';
+import { useGameStore } from '../store/gameStore';
 import { decodeHtmlEntities } from '../utils/scoring';
 
 type GameScreenProps = {
@@ -28,6 +29,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
   const { roomId } = route.params;
   const { user } = useAuth();
   const { room, players, isHost, roomDeleted } = useRoom(roomId);
+  const { audioUris } = useGameStore();
   const {
     currentSong,
     currentSongIndex,
@@ -180,30 +182,61 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Video Player - render after host clicks Load Videos */}
-        {showVideo && playbackStarted && (
+        {/* Audio/Video Player - render after host clicks Start Round */}
+        {/* In host_only mode, only the host gets the player */}
+        {showVideo && playbackStarted && (room.settings.playbackMode === 'all_players' || isHost) && (
           <View style={styles.videoContainer}>
-            <YouTubePlayer
-              videoId={currentSong.youtubeId}
-              startTime={currentSong.peakStartTime || 0}
-              duration={
-                room.settings.playbackDuration > 0
-                  ? room.settings.playbackDuration
-                  : undefined
-              }
-              onContentReady={handleContentReady}
-              autoPlay={true}
-              playing={musicPlaying}
-            />
+            {audioUris.get(currentSong.id) ? (
+              // Use downloaded audio (no ads!)
+              <AudioPlayer
+                localUri={audioUris.get(currentSong.id)!}
+                startTime={currentSong.peakStartTime || 0}
+                duration={
+                  room.settings.playbackDuration > 0
+                    ? room.settings.playbackDuration
+                    : undefined
+                }
+                onReady={handleContentReady}
+                playing={musicPlaying}
+                songTitle={currentSong.title}
+              />
+            ) : (
+              // Fallback to YouTube player
+              <YouTubePlayer
+                videoId={currentSong.youtubeId}
+                startTime={currentSong.peakStartTime || 0}
+                duration={
+                  room.settings.playbackDuration > 0
+                    ? room.settings.playbackDuration
+                    : undefined
+                }
+                onContentReady={handleContentReady}
+                autoPlay={true}
+                playing={musicPlaying}
+              />
+            )}
           </View>
         )}
 
-        {/* Placeholder before videos load */}
+        {/* Host-only playback message for non-hosts */}
+        {showVideo && playbackStarted && room.settings.playbackMode === 'host_only' && !isHost && (
+          <View style={styles.hostPlayingPlaceholder}>
+            <Ionicons name="volume-high" size={48} color={colors.neonPink} />
+            <Text style={styles.hostPlayingText}>
+              Host odtwarza muzykę...
+            </Text>
+            <Text style={styles.hostPlayingSubtext}>
+              Słuchaj razem z hostem i zgaduj!
+            </Text>
+          </View>
+        )}
+
+        {/* Placeholder before playback starts */}
         {showVideo && !playbackStarted && (
           <View style={styles.videoPlaceholder}>
             <Ionicons name="musical-notes" size={48} color={colors.neonPink} />
             <Text style={styles.videoPlaceholderText}>
-              {isHost ? 'Click "Load Videos" to start' : 'Waiting for host...'}
+              {isHost ? 'Click "Start Round" to begin' : 'Waiting for host...'}
             </Text>
           </View>
         )}
@@ -429,6 +462,29 @@ const styles = StyleSheet.create({
   videoPlaceholderText: {
     color: colors.textSecondary,
     fontSize: fontSize.md,
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  hostPlayingPlaceholder: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.neonPink + '40',
+  },
+  hostPlayingText: {
+    color: colors.neonPink,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
+    textAlign: 'center',
+  },
+  hostPlayingSubtext: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
     textAlign: 'center',
     paddingHorizontal: spacing.lg,
   },
