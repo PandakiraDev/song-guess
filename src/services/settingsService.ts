@@ -11,6 +11,7 @@ const DEFAULT_SERVER_URL = 'http://127.0.0.1:3001';
 export const getServerUrl = async (): Promise<string> => {
   try {
     const url = await AsyncStorage.getItem(STORAGE_KEYS.SERVER_URL);
+    console.log('[SettingsService] Stored URL:', url, '| Returning:', url || DEFAULT_SERVER_URL);
     return url || DEFAULT_SERVER_URL;
   } catch (error) {
     console.error('Failed to get server URL:', error);
@@ -21,7 +22,11 @@ export const getServerUrl = async (): Promise<string> => {
 // Save server URL
 export const setServerUrl = async (url: string): Promise<void> => {
   try {
+    console.log('[SettingsService] Saving URL:', url);
     await AsyncStorage.setItem(STORAGE_KEYS.SERVER_URL, url);
+    // Verify save
+    const saved = await AsyncStorage.getItem(STORAGE_KEYS.SERVER_URL);
+    console.log('[SettingsService] Verified saved URL:', saved);
   } catch (error) {
     console.error('Failed to save server URL:', error);
   }
