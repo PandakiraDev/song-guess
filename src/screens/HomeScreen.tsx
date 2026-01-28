@@ -68,7 +68,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
               <View style={styles.userTextContainer}>
                 <Text style={styles.userName} numberOfLines={1}>
-                  {user ? user.displayName : 'Not signed in'}
+                  {user ? user.displayName : 'Niezalogowany'}
                 </Text>
                 <View style={styles.statusRow}>
                   <View style={[
@@ -76,7 +76,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                     { backgroundColor: user && !user.isGuest ? colors.neonGreen : colors.textMuted }
                   ]} />
                   <Text style={styles.userStatus}>
-                    {user ? (user.isGuest ? 'Guest' : 'Signed in') : 'Tap to sign in'}
+                    {user ? (user.isGuest ? 'Gość' : 'Zalogowany') : 'Kliknij, aby się zalogować'}
                   </Text>
                 </View>
               </View>
@@ -101,7 +101,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         {/* Main Actions */}
         <View style={styles.actions}>
           <Button
-            title="Create Room"
+            title="Utwórz pokój"
             onPress={handleCreateRoom}
             size="large"
             fullWidth
@@ -109,7 +109,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           />
 
           <Button
-            title="Join Room"
+            title="Dołącz do pokoju"
             onPress={handleJoinRoom}
             variant="outline"
             size="large"
@@ -118,7 +118,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           />
 
           <Button
-            title="Scan QR Code"
+            title="Skanuj kod QR"
             onPress={() => navigation.navigate('QRScanner')}
             variant="secondary"
             size="large"
@@ -145,25 +145,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         {/* How to Play */}
         <View style={styles.howToPlay}>
-          <Text style={styles.howToPlayTitle}>How to Play</Text>
+          <Text style={styles.howToPlayTitle}>Jak grać</Text>
           <View style={styles.steps}>
             <View style={styles.step}>
               <View style={styles.stepNumber}>
                 <Text style={styles.stepNumberText}>1</Text>
               </View>
-              <Text style={styles.stepText}>Create or join a room</Text>
+              <Text style={styles.stepText}>Utwórz lub dołącz do pokoju</Text>
             </View>
             <View style={styles.step}>
               <View style={styles.stepNumber}>
                 <Text style={styles.stepNumberText}>2</Text>
               </View>
-              <Text style={styles.stepText}>Everyone adds their favorite songs</Text>
+              <Text style={styles.stepText}>Każdy dodaje swoje ulubione piosenki</Text>
             </View>
             <View style={styles.step}>
               <View style={styles.stepNumber}>
                 <Text style={styles.stepNumberText}>3</Text>
               </View>
-              <Text style={styles.stepText}>Guess who added each song!</Text>
+              <Text style={styles.stepText}>Zgadnij kto dodał daną piosenkę!</Text>
             </View>
           </View>
         </View>

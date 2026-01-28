@@ -107,8 +107,8 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
   useEffect(() => {
     if (roomDeleted) {
       Alert.alert(
-        'Room Closed',
-        'The host has closed the room.',
+        'Pokój zamknięty',
+        'Host zamknął pokój.',
         [{ text: 'OK', onPress: () => navigation.replace('Home') }],
         { cancelable: false }
       );
@@ -135,7 +135,7 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
       const results = await searchYouTube(searchQuery);
       setSearchResults(results);
     } catch (error) {
-      Alert.alert('Search Error', 'Failed to search YouTube. Please try again.');
+      Alert.alert('Błąd wyszukiwania', 'Nie udało się przeszukać YouTube. Spróbuj ponownie.');
     } finally {
       setIsSearching(false);
     }
@@ -144,15 +144,15 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
   const handleAddSong = async (result: YouTubeSearchResult) => {
     if (mySongs.length >= requiredSongsCount) {
       Alert.alert(
-        'Limit Reached',
-        `You can only add ${requiredSongsCount} songs.`
+        'Osiągnięto limit',
+        `Możesz dodać tylko ${requiredSongsCount} piosenek.`
       );
       return;
     }
 
     // Validate that the result has required data
     if (!result.videoId) {
-      Alert.alert('Error', 'Invalid video. Please try a different song.');
+      Alert.alert('Błąd', 'Nieprawidłowy film. Spróbuj inną piosenkę.');
       return;
     }
 
@@ -164,7 +164,7 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
         prev.filter((r) => r.videoId !== result.videoId)
       );
     } catch (error) {
-      Alert.alert('Error', 'Failed to add song. Please try again.');
+      Alert.alert('Błąd', 'Nie udało się dodać piosenki. Spróbuj ponownie.');
     } finally {
       setIsAddingSong(false);
     }
@@ -194,7 +194,7 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
         await addSong(song.videoId, song.title, song.thumbnail);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to add test songs.');
+      Alert.alert('Błąd', 'Nie udało się dodać testowych piosenek.');
     } finally {
       setIsAddingTestSongs(false);
     }
@@ -203,8 +203,8 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
   const handleStartGame = async () => {
     if (!allPlayersHaveEnoughSongs) {
       Alert.alert(
-        'Not Ready',
-        'All players must add their songs before starting.'
+        'Nie gotowe',
+        'Wszyscy gracze muszą dodać swoje piosenki przed rozpoczęciem.'
       );
       return;
     }
@@ -255,7 +255,7 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Add Songs</Text>
+        <Text style={styles.title}>Dodaj piosenki</Text>
         <View style={styles.progress}>
           <Text style={styles.progressText}>
             {mySongs.length}/{requiredSongsCount}
@@ -266,7 +266,7 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
       {/* My Songs Section */}
       {mySongs.length > 0 && (
         <View style={styles.mySongsSection}>
-          <Text style={styles.sectionTitle}>Your Songs ({mySongs.length}/{requiredSongsCount})</Text>
+          <Text style={styles.sectionTitle}>Twoje piosenki ({mySongs.length}/{requiredSongsCount})</Text>
           <View style={styles.mySongsList}>
             {mySongs.map((song) => (
               <View key={song.id} style={styles.mySongItem}>
@@ -286,7 +286,7 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
         <View style={styles.searchSection}>
           <View style={styles.searchBar}>
             <Input
-              placeholder="Search for songs..."
+              placeholder="Szukaj piosenek..."
               value={searchQuery}
               onChangeText={setSearchQuery}
               onSubmitEditing={handleSearch}
@@ -294,7 +294,7 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
               containerStyle={styles.searchInput}
             />
             <Button
-              title="Search"
+              title="Szukaj"
               onPress={handleSearch}
               loading={isSearching}
               disabled={!searchQuery.trim()}
@@ -313,7 +313,7 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
               <Ionicons name="flask" size={18} color={colors.neonBlue} />
             )}
             <Text style={styles.testSongsText}>
-              {isAddingTestSongs ? 'Adding...' : 'Add Test Songs (Dev)'}
+              {isAddingTestSongs ? 'Dodawanie...' : 'Dodaj testowe piosenki (Dev)'}
             </Text>
           </TouchableOpacity>
 
@@ -333,7 +333,7 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
           {isSearching && (
             <View style={styles.searchingIndicator}>
               <ActivityIndicator color={colors.neonPink} />
-              <Text style={styles.searchingText}>Searching...</Text>
+              <Text style={styles.searchingText}>Szukanie...</Text>
             </View>
           )}
         </View>
@@ -343,18 +343,18 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
       {hasEnoughSongs && (
         <Card style={styles.completedCard}>
           <Ionicons name="checkmark-circle" size={48} color={colors.success} />
-          <Text style={styles.completedTitle}>All songs added!</Text>
+          <Text style={styles.completedTitle}>Wszystkie piosenki dodane!</Text>
           <Text style={styles.completedText}>
             {isHost
-              ? 'Waiting for other players to finish...'
-              : 'Waiting for the host to start the game...'}
+              ? 'Czekam aż inni gracze skończą...'
+              : 'Czekam aż host rozpocznie grę...'}
           </Text>
         </Card>
       )}
 
       {/* Player Progress */}
       <View style={styles.playerProgress} key={`progress-${refreshKey}`}>
-        <Text style={styles.sectionTitle}>Player Progress ({songs.length} songs total)</Text>
+        <Text style={styles.sectionTitle}>Postęp graczy ({songs.length} piosenek łącznie)</Text>
         <View style={styles.progressList}>
           {getPlayerProgress().map((player) => (
             <View key={player.id} style={styles.playerProgressItem}>
@@ -387,7 +387,7 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
       {isHost && (
         <View style={styles.footer}>
           <Button
-            title="Start Game"
+            title="Rozpocznij grę"
             onPress={handleStartGame}
             size="large"
             fullWidth

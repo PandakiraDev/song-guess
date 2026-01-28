@@ -14,8 +14,9 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Song, Vote, Player } from '../types';
+import { Song, Vote, Player, ScoringMode } from '../types';
 import { getBestStartTime, getVideoDetails } from './youtubeService';
+import { calculateScore } from '../utils/scoring';
 
 // Add a song to the room
 export const addSong = async (
@@ -203,9 +204,10 @@ export const processVotesForSong = async (
   roomId: string,
   songId: string,
   correctPlayerId: string,
-  _votingTime: number,
+  votingTime: number,
   players: Player[],
-  existingVotes?: Vote[]
+  existingVotes?: Vote[],
+  scoringMode: ScoringMode = 'simple'
 ): Promise<void> => {
   // Use existing votes if provided, otherwise fetch (for backwards compatibility)
   const votes = existingVotes
@@ -221,19 +223,26 @@ export const processVotesForSong = async (
 
     if (!player) continue;
 
-    // Simple scoring: 1 point for correct answer
-    const points = isCorrect ? 1 : 0;
+    const newStreak = isCorrect ? player.streak + 1 : 0;
+    const scoreBreakdown = calculateScore(
+      isCorrect,
+      vote.responseTime,
+      votingTime,
+      isCorrect ? player.streak : 0,
+      scoringMode
+    );
 
     // Update vote with results
     const voteId = `${vote.playerId}_${songId}`;
     batch.update(doc(db, 'rooms', roomId, 'votes', voteId), {
       correct: isCorrect,
-      points,
+      points: scoreBreakdown.total,
     });
 
-    // Update player score
+    // Update player score and streak
     batch.update(doc(db, 'rooms', roomId, 'players', vote.playerId), {
-      score: player.score + points,
+      score: player.score + scoreBreakdown.total,
+      streak: newStreak,
     });
   }
 
@@ -278,12 +287,10 @@ export const resetGameForReplay = async (roomId: string): Promise<void> => {
     batch.delete(voteDoc.ref);
   });
 
-  // Reset all songs to unplayed
+  // Delete all songs (clean slate for new game)
   const songsSnapshot = await getDocs(collection(db, 'rooms', roomId, 'songs'));
   songsSnapshot.docs.forEach((songDoc) => {
-    batch.update(songDoc.ref, {
-      played: false,
-    });
+    batch.delete(songDoc.ref);
   });
 
   // Reset room status and song index

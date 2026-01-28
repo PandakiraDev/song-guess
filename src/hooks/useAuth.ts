@@ -3,11 +3,17 @@ import { useUserStore } from '../store/userStore';
 import {
   signUpWithEmail,
   signInWithEmail,
+  signInWithGoogle,
   signOut,
   createGuestUser,
   getUserData,
   subscribeToAuthState,
 } from '../services/authService';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+
+GoogleSignin.configure({
+  webClientId: '907750033094-087juabjscaf69qlqntfaj0k74uoahob.apps.googleusercontent.com',
+});
 
 export const useAuth = () => {
   const { user, isLoading, isAuthenticated, setUser, setLoading, clearUser, loadStoredUser } =
@@ -79,6 +85,26 @@ export const useAuth = () => {
     [setUser, setLoading]
   );
 
+  // Sign in with Google
+  const signInGoogle = useCallback(async () => {
+    setLoading(true);
+    try {
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
+      const idToken = response.data?.idToken;
+      if (!idToken) throw new Error('No ID token from Google');
+      const userData = await signInWithGoogle(idToken);
+      if (userData) {
+        setUser(userData);
+      }
+      return userData;
+    } catch (error) {
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [setUser, setLoading]);
+
   // Sign out
   const handleSignOut = useCallback(async () => {
     try {
@@ -101,6 +127,7 @@ export const useAuth = () => {
     signInAsGuest,
     signUp,
     signIn,
+    signInGoogle,
     signOut: handleSignOut,
   };
 };

@@ -55,18 +55,18 @@ export const CreateRoomScreen: React.FC<CreateRoomScreenProps> = ({ navigation }
           >
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.title}>Create Room</Text>
+          <Text style={styles.title}>Utwórz pokój</Text>
         </View>
 
         <View style={styles.content}>
           <Card style={styles.authPrompt}>
             <Ionicons name="person-circle" size={64} color={colors.neonBlue} />
-            <Text style={styles.authTitle}>Sign In Required</Text>
+            <Text style={styles.authTitle}>Wymagane logowanie</Text>
             <Text style={styles.authDescription}>
-              You need to sign in or play as a guest to create a room.
+              Musisz się zalogować lub grać jako gość, aby utworzyć pokój.
             </Text>
             <Button
-              title="Continue"
+              title="Kontynuuj"
               onPress={() => navigation.navigate('Auth')}
               fullWidth
             />
@@ -85,19 +85,19 @@ export const CreateRoomScreen: React.FC<CreateRoomScreenProps> = ({ navigation }
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Create Room</Text>
+        <Text style={styles.title}>Utwórz pokój</Text>
       </View>
 
       <View style={styles.content}>
         <Card style={styles.infoCard}>
           <Ionicons name="information-circle" size={24} color={colors.neonBlue} />
           <Text style={styles.infoText}>
-            Create a room and share the code with your friends to start playing!
+            Utwórz pokój i udostępnij kod znajomym, aby zacząć grać!
           </Text>
         </Card>
 
         <View style={styles.userPreview}>
-          <Text style={styles.previewLabel}>Playing as</Text>
+          <Text style={styles.previewLabel}>Grasz jako</Text>
           <Card style={styles.userCard}>
             <View style={styles.userInfo}>
               <View style={styles.avatar}>
@@ -107,7 +107,7 @@ export const CreateRoomScreen: React.FC<CreateRoomScreenProps> = ({ navigation }
               </View>
               <View>
                 <Text style={styles.userName}>{user.displayName}</Text>
-                <Text style={styles.userRole}>Host</Text>
+                <Text style={styles.userRole}>Host (Gospodarz)</Text>
               </View>
             </View>
           </Card>
@@ -122,7 +122,7 @@ export const CreateRoomScreen: React.FC<CreateRoomScreenProps> = ({ navigation }
 
         <View style={styles.actions}>
           <Button
-            title="Create Room"
+            title="Utwórz pokój"
             onPress={handleCreateRoom}
             loading={isLoading}
             size="large"

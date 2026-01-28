@@ -219,7 +219,8 @@ export const useGame = (roomId?: string) => {
       currentSong.addedBy,
       room.settings.votingTime,
       players,
-      votes
+      votes,
+      room.settings.scoringMode || 'simple'
     );
 
     // Update room status to 'reveal' and reset votingActive - this syncs across all clients
@@ -363,6 +364,16 @@ export const useGame = (roomId?: string) => {
 
   // Voting active state from room
   const votingActive = room?.votingActive || false;
+
+  // Set votingStartTime for non-host when voting becomes active
+  useEffect(() => {
+    if (votingActive && !votingStartTime) {
+      setVotingStartTime(Date.now());
+    }
+    if (!votingActive) {
+      setVotingStartTime(null);
+    }
+  }, [votingActive]);
 
   // Get songs added by current user
   const mySongs = useMemo(

@@ -53,8 +53,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ navigation, route }) =
   useEffect(() => {
     if (roomDeleted && !isLeavingRef.current) {
       Alert.alert(
-        'Room Closed',
-        'The room has been closed by the host.',
+        'Pokój zamknięty',
+        'Host zamknął pokój.',
         [{ text: 'OK', onPress: () => navigation.replace('Home') }],
         { cancelable: false }
       );
@@ -63,14 +63,14 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ navigation, route }) =
 
   const handleLeaveRoom = () => {
     Alert.alert(
-      isHost ? 'Close Room' : 'Leave Room',
+      isHost ? 'Zamknij pokój' : 'Opuść pokój',
       isHost
-        ? 'Are you sure you want to close the room? All players will be removed.'
-        : 'Are you sure you want to leave?',
+        ? 'Na pewno chcesz zamknąć pokój? Wszyscy gracze zostaną usunięci.'
+        : 'Na pewno chcesz opuścić pokój?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Anuluj', style: 'cancel' },
         {
-          text: isHost ? 'Close' : 'Leave',
+          text: isHost ? 'Zamknij' : 'Opuść',
           style: 'destructive',
           onPress: async () => {
             isLeavingRef.current = true;
@@ -84,7 +84,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ navigation, route }) =
 
   const handleStartGame = async () => {
     if (players.length < 2) {
-      Alert.alert('Not Enough Players', 'You need at least 2 players to start the game.');
+      Alert.alert('Za mało graczy', 'Potrzebujesz co najmniej 2 graczy aby rozpocząć grę.');
       return;
     }
 
@@ -95,7 +95,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ navigation, route }) =
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading room...</Text>
+          <Text style={styles.loadingText}>Ładowanie pokoju...</Text>
         </View>
       </SafeAreaView>
     );
@@ -110,7 +110,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ navigation, route }) =
         </TouchableOpacity>
         <Text style={styles.title}>Lobby</Text>
         <View style={styles.roomCode}>
-          <Text style={styles.roomCodeLabel}>Code:</Text>
+          <Text style={styles.roomCodeLabel}>Kod:</Text>
           <Text style={styles.roomCodeValue}>{room.code}</Text>
         </View>
       </View>
@@ -157,12 +157,12 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ navigation, route }) =
               />
               <Text style={styles.readyText}>
                 {currentPlayer.isReady
-                  ? 'Ready! Waiting for host to start...'
-                  : 'Tap Ready when you\'re set to play'}
+                  ? 'Gotowy! Czekam aż host rozpocznie...'
+                  : 'Kliknij Gotowy gdy jesteś gotowy do gry'}
               </Text>
             </View>
             <Button
-              title={currentPlayer.isReady ? 'Not Ready' : 'Ready'}
+              title={currentPlayer.isReady ? 'Nie gotowy' : 'Gotowy'}
               variant={currentPlayer.isReady ? 'outline' : 'primary'}
               onPress={() => toggleReady(!currentPlayer.isReady)}
             />
@@ -174,7 +174,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ navigation, route }) =
           <Card style={styles.waitingCard}>
             <Ionicons name="time-outline" size={24} color={colors.warning} />
             <Text style={styles.waitingText}>
-              Waiting for all players to be ready...
+              Czekam aż wszyscy gracze będą gotowi...
             </Text>
           </Card>
         )}
@@ -184,7 +184,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ navigation, route }) =
       {isHost && (
         <View style={styles.footer}>
           <Button
-            title="Start Game"
+            title="Rozpocznij grę"
             onPress={handleStartGame}
             size="large"
             fullWidth
@@ -193,12 +193,12 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({ navigation, route }) =
           />
           {players.length < 2 && (
             <Text style={styles.minPlayersText}>
-              Need at least 2 players to start
+              Potrzeba co najmniej 2 graczy
             </Text>
           )}
           {players.length >= 2 && !allPlayersReady && (
             <Text style={styles.minPlayersText}>
-              Waiting for all players to be ready
+              Czekam aż wszyscy gracze będą gotowi
             </Text>
           )}
         </View>

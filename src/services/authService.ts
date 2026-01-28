@@ -44,6 +44,12 @@ export const signUpWithEmail = async (
     gamesPlayed: 0,
     totalWins: 0,
     totalPoints: 0,
+    totalCorrectGuesses: 0,
+    totalGuesses: 0,
+    totalResponseTimeMs: 0,
+    totalResponseCount: 0,
+    fastestCorrectMs: 0,
+    bestStreak: 0,
     createdAt: serverTimestamp() as any,
   };
 
@@ -83,6 +89,12 @@ export const signInWithGoogle = async (idToken: string): Promise<User | null> =>
       gamesPlayed: 0,
       totalWins: 0,
       totalPoints: 0,
+      totalCorrectGuesses: 0,
+      totalGuesses: 0,
+      totalResponseTimeMs: 0,
+      totalResponseCount: 0,
+      fastestCorrectMs: 0,
+      bestStreak: 0,
       createdAt: serverTimestamp() as any,
     };
 
@@ -116,11 +128,22 @@ export const getUserData = async (userId: string): Promise<User | null> => {
   } as User;
 };
 
+// Game stats passed from ResultsScreen after a game
+export interface GameStatsUpdate {
+  won: boolean;
+  points: number;
+  correctGuesses: number;
+  totalGuesses: number;
+  totalResponseTimeMs: number;
+  responseCount: number;
+  fastestCorrectMs: number;
+  bestStreak: number;
+}
+
 // Update user stats after game
 export const updateUserStats = async (
   userId: string,
-  won: boolean,
-  points: number
+  stats: GameStatsUpdate
 ): Promise<void> => {
   const userDoc = await getDoc(doc(db, 'users', userId));
 
@@ -128,14 +151,22 @@ export const updateUserStats = async (
     return;
   }
 
-  const currentData = userDoc.data() as User;
+  const d = userDoc.data() as User;
 
   await setDoc(
     doc(db, 'users', userId),
     {
-      gamesPlayed: currentData.gamesPlayed + 1,
-      totalWins: currentData.totalWins + (won ? 1 : 0),
-      totalPoints: currentData.totalPoints + points,
+      gamesPlayed: (d.gamesPlayed || 0) + 1,
+      totalWins: (d.totalWins || 0) + (stats.won ? 1 : 0),
+      totalPoints: (d.totalPoints || 0) + stats.points,
+      totalCorrectGuesses: (d.totalCorrectGuesses || 0) + stats.correctGuesses,
+      totalGuesses: (d.totalGuesses || 0) + stats.totalGuesses,
+      totalResponseTimeMs: (d.totalResponseTimeMs || 0) + stats.totalResponseTimeMs,
+      totalResponseCount: (d.totalResponseCount || 0) + stats.responseCount,
+      fastestCorrectMs: stats.fastestCorrectMs > 0
+        ? Math.min(d.fastestCorrectMs || Infinity, stats.fastestCorrectMs)
+        : (d.fastestCorrectMs || 0),
+      bestStreak: Math.max(d.bestStreak || 0, stats.bestStreak),
     },
     { merge: true }
   );

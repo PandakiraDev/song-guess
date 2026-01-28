@@ -33,6 +33,7 @@ export const defaultRoomSettings: RoomSettings = {
   votingTime: 15,
   playbackMode: 'all_players',
   audioSource: 'youtube',
+  scoringMode: 'simple',
 };
 
 // Create a new room
@@ -120,11 +121,11 @@ export const joinRoomByCode = async (
   const room = await getRoomByCode(code);
 
   if (!room) {
-    throw new Error('Room not found. Please check the code and try again.');
+    throw new Error('Pokój nie znaleziony. Sprawdź kod i spróbuj ponownie.');
   }
 
   if (room.status !== 'lobby') {
-    throw new Error('Cannot join - game is already in progress');
+    throw new Error('Nie można dołączyć - gra już trwa');
   }
 
   // Check if player is already in the room

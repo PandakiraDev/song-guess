@@ -63,11 +63,11 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
   const validateNickname = (): boolean => {
     const trimmed = nickname.trim();
     if (trimmed.length < 2) {
-      setNicknameError('Nickname must be at least 2 characters');
+      setNicknameError('Pseudonim musi mieć co najmniej 2 znaki');
       return false;
     }
     if (trimmed.length > 20) {
-      setNicknameError('Nickname must be less than 20 characters');
+      setNicknameError('Pseudonim musi mieć mniej niż 20 znaków');
       return false;
     }
     setNicknameError(null);
@@ -101,7 +101,7 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
       navigation.goBack();
     } catch (error) {
       console.error('Failed to save profile:', error);
-      Alert.alert('Error', 'Failed to save profile. Please try again.');
+      Alert.alert('Błąd', 'Nie udało się zapisać profilu. Spróbuj ponownie.');
     } finally {
       setIsSaving(false);
     }
@@ -111,11 +111,11 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
   const handleBack = () => {
     if (hasChanges()) {
       Alert.alert(
-        'Discard Changes?',
-        'You have unsaved changes. Are you sure you want to go back?',
+        'Odrzucić zmiany?',
+        'Masz niezapisane zmiany. Na pewno chcesz wrócić?',
         [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Discard', style: 'destructive', onPress: () => navigation.goBack() },
+          { text: 'Anuluj', style: 'cancel' },
+          { text: 'Odrzuć', style: 'destructive', onPress: () => navigation.goBack() },
         ]
       );
     } else {
@@ -130,11 +130,11 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.title}>Edit Profile</Text>
+          <Text style={styles.title}>Edytuj profil</Text>
           <View style={styles.placeholder} />
         </View>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Only registered users can edit profile</Text>
+          <Text style={styles.errorText}>Tylko zarejestrowani użytkownicy mogą edytować profil</Text>
         </View>
       </SafeAreaView>
     );
@@ -151,7 +151,7 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.title}>Edit Profile</Text>
+          <Text style={styles.title}>Edytuj profil</Text>
           <TouchableOpacity
             onPress={handleSave}
             style={styles.saveButton}
@@ -160,7 +160,7 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
             {isSaving ? (
               <ActivityIndicator color={colors.neonPink} size="small" />
             ) : (
-              <Text style={styles.saveButtonText}>Save</Text>
+              <Text style={styles.saveButtonText}>Zapisz</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -172,7 +172,7 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
         >
           {/* Nickname Input */}
           <Card style={styles.section}>
-            <Text style={styles.sectionTitle}>Nickname</Text>
+            <Text style={styles.sectionTitle}>Pseudonim</Text>
             <TextInput
               style={[styles.input, nicknameError && styles.inputError]}
               value={nickname}
@@ -180,7 +180,7 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
                 setNickname(text);
                 if (nicknameError) setNicknameError(null);
               }}
-              placeholder="Enter nickname"
+              placeholder="Wpisz pseudonim"
               placeholderTextColor={colors.textMuted}
               maxLength={20}
               autoCapitalize="none"

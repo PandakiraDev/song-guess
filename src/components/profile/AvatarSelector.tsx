@@ -18,7 +18,7 @@ export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
 }) => {
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Choose Avatar</Text>
+      <Text style={styles.label}>Wybierz awatar</Text>
 
       <View style={styles.grid}>
         {/* Predefined avatars */}
@@ -44,7 +44,7 @@ export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
       </View>
 
       <Text style={styles.hint}>
-        Tap to select an avatar
+        Kliknij aby wybrać awatar
       </Text>
     </View>
   );

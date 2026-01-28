@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +15,7 @@ import Animated, {
   useAnimatedStyle,
   withDelay,
   withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -26,7 +27,7 @@ import { useRoom } from '../hooks/useRoom';
 import { useGame } from '../hooks/useGame';
 import { useAuth } from '../hooks/useAuth';
 import { getRankedPlayers, decodeHtmlEntities } from '../utils/scoring';
-import { updateUserStats, getUserData } from '../services/authService';
+import { updateUserStats, getUserData, GameStatsUpdate } from '../services/authService';
 import { useUserStore } from '../store/userStore';
 import { clearAudioCache } from '../services/audioDownloadService';
 
@@ -47,103 +48,206 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
   const confettiScale = useSharedValue(0);
   const statsUpdated = useRef(false);
   const isLeavingRef = useRef(false);
+  const [showRoomClosed, setShowRoomClosed] = useState(false);
+  const [waitingForHost, setWaitingForHost] = useState(false);
+  const overlayOpacity = useSharedValue(0);
 
   useEffect(() => {
     // Animate confetti
     confettiScale.value = withDelay(500, withSpring(1, { damping: 8 }));
   }, []);
 
-  // Handle room deletion (host left)
+  // Handle room deletion (host left) - smooth overlay instead of Alert
   useEffect(() => {
     if (roomDeleted && !isLeavingRef.current) {
-      Alert.alert(
-        'Room Closed',
-        'The host has closed the room.',
-        [{ text: 'OK', onPress: () => navigation.replace('Home') }],
-        { cancelable: false }
-      );
+      setShowRoomClosed(true);
+      overlayOpacity.value = withTiming(1, { duration: 400 });
+      // Auto-navigate home after 2.5 seconds
+      const timeout = setTimeout(() => {
+        navigation.replace('Home');
+      }, 2500);
+      return () => clearTimeout(timeout);
     }
   }, [roomDeleted, navigation]);
 
-  const setUser = useUserStore((state) => state.setUser);
-
-  // Update user stats once when results are shown
+  // Handle room status change to 'lobby' (host triggered play again)
   useEffect(() => {
-    const updateStats = async () => {
-      if (!user || user.isGuest || statsUpdated.current || players.length === 0) return;
+    if (room?.status === 'lobby' && !isLeavingRef.current) {
+      isLeavingRef.current = true;
+      clearAudioCache();
+      navigation.replace('Lobby', { roomId });
+    }
+  }, [room?.status, roomId, navigation]);
 
-      const rankedList = getRankedPlayers(players);
-      const myPlayer = rankedList.find(p => p.id === user.id);
-
-      if (myPlayer) {
-        statsUpdated.current = true;
-        const isWinner = myPlayer.rank === 1;
-        await updateUserStats(user.id, isWinner, myPlayer.score);
-
-        // Refresh user data to update stats in the store
-        const updatedUser = await getUserData(user.id);
-        if (updatedUser) {
-          setUser(updatedUser);
-        }
-      }
-    };
-
-    updateStats();
-  }, [user, players, setUser]);
+  const setUser = useUserStore((state) => state.setUser);
 
   const confettiStyle = useAnimatedStyle(() => ({
     transform: [{ scale: confettiScale.value }],
   }));
 
-  // Memoize computed values to avoid recalculation on every render
-  const rankedPlayers = useMemo(() => getRankedPlayers(players), [players]);
-  const winner = rankedPlayers[0];
+  const roomClosedStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+  }));
+
+  // Compute avg response time per player for tiebreaking
+  const playersWithAvgTime = useMemo(() => {
+    return players.map(p => {
+      const playerVotes = votes.filter(v => v.playerId === p.id && v.correct);
+      const avg = playerVotes.length > 0
+        ? playerVotes.reduce((sum, v) => sum + (v.responseTime || 0), 0) / playerVotes.length
+        : undefined;
+      return { ...p, avgResponseTime: avg };
+    });
+  }, [players, votes]);
+
+  const rankedPlayers = useMemo(() => getRankedPlayers(playersWithAvgTime), [playersWithAvgTime]);
+  const winners = useMemo(() => rankedPlayers.filter(p => p.rank === 1), [rankedPlayers]);
   const currentUserRank = useMemo(
     () => rankedPlayers.find((p) => p.id === user?.id)?.rank || 0,
     [rankedPlayers, user?.id]
   );
 
-  // Calculate stats - memoized
+  // Update user stats once when results are shown
+  useEffect(() => {
+    const updateStats = async () => {
+      if (!user || user.isGuest || statsUpdated.current || rankedPlayers.length === 0) return;
+
+      const myPlayer = rankedPlayers.find(p => p.id === user.id);
+      if (!myPlayer) return;
+
+      statsUpdated.current = true;
+
+      // Compute per-game stats for this player
+      const myVotes = votes.filter(v => v.playerId === user.id);
+      const correctVotes = myVotes.filter(v => v.correct);
+      const votesWithTime = myVotes.filter(v => v.responseTime != null && v.responseTime > 0);
+      const correctWithTime = correctVotes.filter(v => v.responseTime != null && v.responseTime > 0);
+
+      // Best streak from this game
+      const songOrder = room?.shuffledSongIds || [];
+      let currentStreak = 0;
+      let maxStreak = 0;
+      for (const songId of songOrder) {
+        const v = myVotes.find(vote => vote.songId === songId);
+        if (v?.correct) {
+          currentStreak++;
+          maxStreak = Math.max(maxStreak, currentStreak);
+        } else {
+          currentStreak = 0;
+        }
+      }
+
+      const fastestCorrect = correctWithTime.length > 0
+        ? Math.min(...correctWithTime.map(v => v.responseTime!))
+        : 0;
+
+      const gameStats: GameStatsUpdate = {
+        won: myPlayer.rank === 1,
+        points: myPlayer.score,
+        correctGuesses: correctVotes.length,
+        totalGuesses: myVotes.length,
+        totalResponseTimeMs: votesWithTime.reduce((sum, v) => sum + (v.responseTime || 0), 0),
+        responseCount: votesWithTime.length,
+        fastestCorrectMs: fastestCorrect,
+        bestStreak: maxStreak,
+      };
+
+      await updateUserStats(user.id, gameStats);
+
+      // Refresh user data to update stats in the store
+      const updatedUser = await getUserData(user.id);
+      if (updatedUser) {
+        setUser(updatedUser);
+      }
+    };
+
+    updateStats();
+  }, [user, rankedPlayers, votes, room?.shuffledSongIds, setUser]);
+
+  // Calculate interesting stats
   const gameStats = useMemo(() => {
-    const totalCorrectGuesses = votes.filter((v) => v.correct).length;
-    const totalVotes = votes.length;
-    const accuracy = totalVotes > 0 ? Math.round((totalCorrectGuesses / totalVotes) * 100) : 0;
-    return { totalCorrectGuesses, totalVotes, accuracy };
-  }, [votes]);
+    const votesWithTime = votes.filter(v => v.responseTime != null && v.responseTime > 0);
+
+    // Average response time across all votes
+    const avgResponseTime = votesWithTime.length > 0
+      ? votesWithTime.reduce((sum, v) => sum + (v.responseTime || 0), 0) / votesWithTime.length
+      : 0;
+
+    // Best streak: find which player had the highest streak
+    let bestStreakPlayer: string | null = null;
+    let bestStreakValue = 0;
+    for (const p of players) {
+      // Calculate max streak from votes
+      const playerVotesBySong = (room?.shuffledSongIds || []).map(songId =>
+        votes.find(v => v.playerId === p.id && v.songId === songId)
+      );
+      let currentStreak = 0;
+      let maxStreak = 0;
+      for (const v of playerVotesBySong) {
+        if (v?.correct) {
+          currentStreak++;
+          maxStreak = Math.max(maxStreak, currentStreak);
+        } else {
+          currentStreak = 0;
+        }
+      }
+      if (maxStreak > bestStreakValue) {
+        bestStreakValue = maxStreak;
+        bestStreakPlayer = p.name;
+      }
+    }
+
+    // Most accurate player (highest % correct, min 1 vote)
+    let mostAccuratePlayer: string | null = null;
+    let bestAccuracy = 0;
+    for (const p of players) {
+      const pVotes = votes.filter(v => v.playerId === p.id);
+      if (pVotes.length === 0) continue;
+      const acc = pVotes.filter(v => v.correct).length / pVotes.length;
+      if (acc > bestAccuracy) {
+        bestAccuracy = acc;
+        mostAccuratePlayer = p.name;
+      }
+    }
+
+    // Fastest single answer
+    let fastestPlayer: string | null = null;
+    let fastestTime = Infinity;
+    for (const v of votesWithTime) {
+      if (v.correct && (v.responseTime || Infinity) < fastestTime) {
+        fastestTime = v.responseTime!;
+        fastestPlayer = players.find(p => p.id === v.playerId)?.name || null;
+      }
+    }
+
+    return {
+      avgResponseTime,
+      bestStreakPlayer,
+      bestStreakValue,
+      mostAccuratePlayer,
+      bestAccuracy: Math.round(bestAccuracy * 100),
+      fastestPlayer,
+      fastestTime: fastestTime === Infinity ? 0 : fastestTime,
+    };
+  }, [votes, players, room?.shuffledSongIds]);
 
   const handlePlayAgain = async () => {
-    // Clear audio cache for fresh start
-    await clearAudioCache();
-    await playAgain();
-    navigation.replace('Lobby', { roomId });
+    if (isHost) {
+      // Host resets the room → all players auto-navigate to lobby via status listener
+      isLeavingRef.current = true;
+      await clearAudioCache();
+      await playAgain();
+      navigation.replace('Lobby', { roomId });
+    } else {
+      // Non-host: show waiting state
+      setWaitingForHost(true);
+    }
   };
 
-  const handleLeaveGame = () => {
-    Alert.alert(
-      isHost ? 'Close Room' : 'Leave Game',
-      isHost
-        ? 'Are you sure you want to close the room? All players will be removed.'
-        : 'Are you sure you want to leave?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: isHost ? 'Close' : 'Leave',
-          style: 'destructive',
-          onPress: async () => {
-            isLeavingRef.current = true;
-            // Clear audio cache when leaving
-            await clearAudioCache();
-            await leaveRoom();
-            navigation.replace('Home');
-          },
-        },
-      ]
-    );
-  };
-
-  const handleGoHome = async () => {
-    // Clear audio cache when leaving
+  const handleLeaveGame = async () => {
+    isLeavingRef.current = true;
     await clearAudioCache();
+    await leaveRoom();
     navigation.replace('Home');
   };
 
@@ -151,7 +255,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading results...</Text>
+          <Text style={styles.loadingText}>Ładowanie wyników...</Text>
         </View>
       </SafeAreaView>
     );
@@ -171,9 +275,13 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
               <Text style={styles.confettiEmoji}>🎉</Text>
             </Animated.View>
 
-            <Text style={styles.winnerLabel}>Winner</Text>
-            <Text style={styles.winnerName}>{winner?.name}</Text>
-            <Text style={styles.winnerScore}>{winner?.score} points</Text>
+            <Text style={styles.winnerLabel}>
+              {winners.length > 1 ? 'Zwycięzcy' : 'Zwycięzca'}
+            </Text>
+            <Text style={styles.winnerName}>
+              {winners.map(w => w.name).join(' & ')}
+            </Text>
+            <Text style={styles.winnerScore}>{winners[0]?.score} pkt</Text>
           </View>
         </Animated.View>
 
@@ -198,19 +306,19 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
                 }
               />
               <View style={styles.yourResultInfo}>
-                <Text style={styles.yourResultLabel}>Your Finish</Text>
+                <Text style={styles.yourResultLabel}>Twój wynik</Text>
                 <Text style={styles.yourResultRank}>
                   {currentUserRank === 1
-                    ? '1st Place!'
+                    ? '1. miejsce!'
                     : currentUserRank === 2
-                    ? '2nd Place'
+                    ? '2. miejsce'
                     : currentUserRank === 3
-                    ? '3rd Place'
-                    : `${currentUserRank}th Place`}
+                    ? '3. miejsce'
+                    : `${currentUserRank}. miejsce`}
                 </Text>
               </View>
               <Text style={styles.yourResultScore}>
-                {rankedPlayers.find((p) => p.id === user.id)?.score || 0} pts
+                {rankedPlayers.find((p) => p.id === user.id)?.score || 0} pkt
               </Text>
             </Card>
           </Animated.View>
@@ -219,31 +327,47 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
         {/* Game Stats */}
         <Animated.View entering={FadeInUp.delay(600)}>
           <Card style={styles.statsCard}>
-            <Text style={styles.statsTitle}>Game Stats</Text>
+            <Text style={styles.statsTitle}>
+              {songs.length} piosenek  ·  {players.length} graczy
+            </Text>
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{songs.length}</Text>
-                <Text style={styles.statLabel}>Songs Played</Text>
+                <Ionicons name="time" size={20} color={colors.neonBlue} />
+                <Text style={styles.statValue}>
+                  {(gameStats.avgResponseTime / 1000).toFixed(2)}s
+                </Text>
+                <Text style={styles.statLabel}>Śr. czas odpowiedzi</Text>
               </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{players.length}</Text>
-                <Text style={styles.statLabel}>Players</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{gameStats.accuracy}%</Text>
-                <Text style={styles.statLabel}>Accuracy</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{gameStats.totalCorrectGuesses}</Text>
-                <Text style={styles.statLabel}>Correct</Text>
-              </View>
+              {gameStats.bestStreakValue > 0 && (
+                <View style={styles.statItem}>
+                  <Ionicons name="flame" size={20} color={colors.warning} />
+                  <Text style={styles.statValue}>{gameStats.bestStreakValue}x</Text>
+                  <Text style={styles.statLabel}>{gameStats.bestStreakPlayer}</Text>
+                </View>
+              )}
+              {gameStats.mostAccuratePlayer && (
+                <View style={styles.statItem}>
+                  <Ionicons name="checkmark-done-circle" size={20} color={colors.neonGreen} />
+                  <Text style={styles.statValue}>{gameStats.bestAccuracy}%</Text>
+                  <Text style={styles.statLabel}>{gameStats.mostAccuratePlayer}</Text>
+                </View>
+              )}
+              {gameStats.fastestPlayer && (
+                <View style={styles.statItem}>
+                  <Ionicons name="flash" size={20} color={colors.neonPink} />
+                  <Text style={styles.statValue}>
+                    {(gameStats.fastestTime / 1000).toFixed(2)}s
+                  </Text>
+                  <Text style={styles.statLabel}>{gameStats.fastestPlayer}</Text>
+                </View>
+              )}
             </View>
           </Card>
         </Animated.View>
 
         {/* Final Scoreboard */}
         <Animated.View entering={FadeInUp.delay(800)}>
-          <Text style={styles.sectionTitle}>Final Standings</Text>
+          <Text style={styles.sectionTitle}>Klasyfikacja końcowa</Text>
           <Scoreboard
             players={players}
             currentUserId={user?.id}
@@ -253,7 +377,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
 
         {/* Round-by-Round Summary */}
         <Animated.View entering={FadeInUp.delay(1000)}>
-          <Text style={styles.sectionTitle}>Round Summary</Text>
+          <Text style={styles.sectionTitle}>Podsumowanie rund</Text>
           {songs.map((song, index) => {
             const songOwner = players.find(p => p.id === song.addedBy);
             const songVotes = votes.filter(v => v.songId === song.id);
@@ -269,7 +393,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
                       {decodeHtmlEntities(song.title)}
                     </Text>
                     <Text style={styles.roundAddedBy}>
-                      Added by: <Text style={styles.roundOwnerName}>{songOwner?.name || 'Unknown'}</Text>
+                      Dodane przez: <Text style={styles.roundOwnerName}>{songOwner?.name || 'Nieznany'}</Text>
                     </Text>
                   </View>
                 </View>
@@ -301,6 +425,11 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
                           >
                             {votedFor?.name || 'Unknown'}
                           </Text>
+                          {vote.responseTime != null && (
+                            <Text style={styles.responseTime}>
+                              {(vote.responseTime / 1000).toFixed(2)}s
+                            </Text>
+                          )}
                           <Ionicons
                             name={isCorrect ? 'checkmark-circle' : 'close-circle'}
                             size={18}
@@ -310,7 +439,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
                       );
                     })
                   ) : (
-                    <Text style={styles.noVotesText}>No votes recorded</Text>
+                    <Text style={styles.noVotesText}>Brak głosów</Text>
                   )}
                 </View>
               </Card>
@@ -321,33 +450,41 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
 
       {/* Actions */}
       <View style={styles.footer}>
-        {isHost ? (
-          <View style={styles.hostActions}>
+        <View style={styles.footerActions}>
+          {waitingForHost ? (
+            <View style={styles.waitingContainer}>
+              <ActivityIndicator color={colors.neonPink} size="small" />
+              <Text style={styles.waitingText}>Czekam na hosta...</Text>
+            </View>
+          ) : (
             <Button
-              title="Play Again"
+              title={isHost ? 'Zagraj ponownie' : 'Zagraj ponownie'}
               onPress={handlePlayAgain}
               size="large"
               fullWidth
               icon={<Ionicons name="refresh" size={24} color={colors.textPrimary} />}
             />
-            <Button
-              title="Leave Game"
-              onPress={handleLeaveGame}
-              variant="outline"
-              size="large"
-              fullWidth
-            />
-          </View>
-        ) : (
+          )}
           <Button
-            title="Back to Home"
-            onPress={handleGoHome}
+            title="Wyjdź"
+            onPress={handleLeaveGame}
+            variant="outline"
             size="large"
             fullWidth
-            icon={<Ionicons name="home" size={24} color={colors.textPrimary} />}
           />
-        )}
+        </View>
       </View>
+
+      {/* Room Closed Overlay */}
+      {showRoomClosed && (
+        <Animated.View style={[styles.roomClosedOverlay, roomClosedStyle]}>
+          <View style={styles.roomClosedContent}>
+            <Ionicons name="close-circle" size={64} color={colors.neonPink} />
+            <Text style={styles.roomClosedTitle}>Pokój zamknięty</Text>
+            <Text style={styles.roomClosedSubtitle}>Host zamknął pokój</Text>
+          </View>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 };
@@ -532,6 +669,13 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
   },
+  responseTime: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    fontFamily: 'monospace',
+    minWidth: 45,
+    textAlign: 'right',
+  },
   voteCorrect: {
     color: colors.success,
   },
@@ -547,8 +691,44 @@ const styles = StyleSheet.create({
   footer: {
     padding: spacing.lg,
   },
-  hostActions: {
+  footerActions: {
     gap: spacing.md,
+  },
+  waitingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.neonPink + '30',
+  },
+  waitingText: {
+    color: colors.textSecondary,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
+  },
+  roomClosedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10, 10, 15, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  roomClosedContent: {
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  roomClosedTitle: {
+    color: colors.textPrimary,
+    fontSize: fontSize.xxl,
+    fontWeight: fontWeight.bold,
+  },
+  roomClosedSubtitle: {
+    color: colors.textSecondary,
+    fontSize: fontSize.md,
   },
 });
 

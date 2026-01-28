@@ -71,19 +71,19 @@ export const useRoom = (roomId?: string) => {
               roomDeletedTimeoutRef.current = setTimeout(() => {
                 if (mountedRef.current) {
                   setRoomDeleted(true);
-                  setError('Room has been closed by the host');
+                  setError('Pokój został zamknięty przez hosta');
                 }
               }, 2000); // Wait 2 seconds before declaring room deleted
             }
           } else if (!initialLoadRef.current) {
-            setError('Room not found');
+            setError('Pokój nie znaleziony');
           }
           // During initial load, just wait - room data may still be coming
         }
       },
       (error) => {
         if (!mountedRef.current) return;
-        setError('Connection error: ' + error.message);
+        setError('Błąd połączenia: ' + error.message);
       }
     );
 

@@ -1,31 +1,45 @@
-import { ScoreBreakdown } from '../types';
+import { ScoreBreakdown, ScoringMode } from '../types';
 
 /**
  * Calculate score for a vote
  *
- * Scoring system:
- * - 1 point for correct answer
+ * Simple mode: +1 for correct, 0 for wrong
+ * Speed mode: 10 base + up to 5 speed bonus + up to 10 streak bonus
  */
 export const calculateScore = (
   isCorrect: boolean,
-  _responseTimeMs?: number,
-  _maxTimeMs?: number,
-  _currentStreak?: number
+  responseTimeMs?: number,
+  maxTimeMs?: number,
+  currentStreak?: number,
+  scoringMode: ScoringMode = 'simple'
 ): ScoreBreakdown => {
   if (!isCorrect) {
-    return {
-      basePoints: 0,
-      speedBonus: 0,
-      streakBonus: 0,
-      total: 0,
-    };
+    return { basePoints: 0, speedBonus: 0, streakBonus: 0, total: 0 };
   }
 
+  if (scoringMode === 'simple') {
+    return { basePoints: 1, speedBonus: 0, streakBonus: 0, total: 1 };
+  }
+
+  // Speed mode
+  const basePoints = 10;
+
+  // Speed bonus: linear from 5 (instant) to 0 (at max time)
+  let speedBonus = 0;
+  if (responseTimeMs != null && maxTimeMs && maxTimeMs > 0) {
+    const ratio = Math.max(0, 1 - responseTimeMs / (maxTimeMs * 1000));
+    speedBonus = Math.round(ratio * 5);
+  }
+
+  // Streak bonus: +2 per streak level, capped at +10
+  const streak = currentStreak ?? 0;
+  const streakBonus = Math.min(streak * 2, 10);
+
   return {
-    basePoints: 1,
-    speedBonus: 0,
-    streakBonus: 0,
-    total: 1,
+    basePoints,
+    speedBonus,
+    streakBonus,
+    total: basePoints + speedBonus + streakBonus,
   };
 };
 
@@ -56,15 +70,15 @@ export const formatScoreBreakdown = (breakdown: ScoreBreakdown): string[] => {
   const parts: string[] = [];
 
   if (breakdown.basePoints > 0) {
-    parts.push(`+${breakdown.basePoints} Correct!`);
+    parts.push(`+${breakdown.basePoints} Poprawna!`);
   }
 
   if (breakdown.speedBonus > 0) {
-    parts.push(`+${breakdown.speedBonus} Speed bonus`);
+    parts.push(`+${breakdown.speedBonus} Bonus za szybkość`);
   }
 
   if (breakdown.streakBonus > 0) {
-    parts.push(`+${breakdown.streakBonus} Streak bonus`);
+    parts.push(`+${breakdown.streakBonus} Bonus za serię`);
   }
 
   return parts;
@@ -74,27 +88,34 @@ export const formatScoreBreakdown = (breakdown: ScoreBreakdown): string[] => {
  * Get ranking position suffix (1st, 2nd, 3rd, etc.)
  */
 export const getPositionSuffix = (position: number): string => {
-  if (position === 1) return '1st';
-  if (position === 2) return '2nd';
-  if (position === 3) return '3rd';
-  return `${position}th`;
+  return `${position}.`;
 };
 
 /**
- * Sort players by score (descending) and return with rankings
+ * Sort players by score (descending), then by avg response time (ascending) as tiebreaker
+ * Returns with rankings (tied players share same rank)
  */
-export const getRankedPlayers = <T extends { score: number }>(
+export const getRankedPlayers = <T extends { score: number; avgResponseTime?: number }>(
   players: T[]
 ): (T & { rank: number })[] => {
-  const sorted = [...players].sort((a, b) => b.score - a.score);
+  const sorted = [...players].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    // Tiebreaker: faster average response time wins
+    const aTime = a.avgResponseTime ?? Infinity;
+    const bTime = b.avgResponseTime ?? Infinity;
+    return aTime - bTime;
+  });
 
   let currentRank = 1;
   let lastScore = -1;
+  let lastTime = -1;
 
   return sorted.map((player, index) => {
-    if (player.score !== lastScore) {
+    const time = player.avgResponseTime ?? Infinity;
+    if (player.score !== lastScore || time !== lastTime) {
       currentRank = index + 1;
       lastScore = player.score;
+      lastTime = time;
     }
 
     return {

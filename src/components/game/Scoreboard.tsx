@@ -40,7 +40,7 @@ const PodiumPlace: React.FC<{
       />
       <Text style={styles.podiumName}>{player.name}</Text>
       <Text style={[styles.podiumScore, { color: colors_map[position] }]}>
-        {player.score} pts
+        {player.score} pkt
       </Text>
       <View
         style={[
@@ -65,11 +65,11 @@ export const Scoreboard: React.FC<ScoreboardProps> = ({
   currentUserId,
   showPodium = false,
 }) => {
-  const rankedPlayers = getRankedPlayers(players);
+  const rankedPlayers = getRankedPlayers(players as (Player & { avgResponseTime?: number })[]);
 
-  // Get top 3 for podium
-  const top3 = rankedPlayers.slice(0, 3);
-  const rest = rankedPlayers.slice(3);
+  // Get top 3 for podium (by rank, not index - handles ties)
+  const top3 = rankedPlayers.filter(p => p.rank <= 3).slice(0, 3);
+  const rest = rankedPlayers.slice(top3.length);
 
   const renderPodium = () => {
     if (!showPodium || top3.length < 1) return null;

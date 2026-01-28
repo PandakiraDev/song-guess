@@ -28,6 +28,7 @@
         "backgroundColor": "#0a0a0f"
       },
       "package": "com.songguess.app",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
@@ -46,7 +47,9 @@
         {
           "cameraPermission": "Allow SongGuess to access your camera to scan QR codes."
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin",
+      "@react-native-firebase/app"
     ],
     "extra": {
       "eas": {

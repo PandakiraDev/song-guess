@@ -11,6 +11,12 @@ export interface User {
   gamesPlayed: number;
   totalWins: number;
   totalPoints: number;
+  totalCorrectGuesses: number;
+  totalGuesses: number;
+  totalResponseTimeMs: number; // sum of all response times
+  totalResponseCount: number; // number of responses with time tracked
+  fastestCorrectMs: number; // fastest correct answer in ms
+  bestStreak: number;
   createdAt: Timestamp;
 }
 
@@ -25,6 +31,7 @@ export interface GuestUser {
 export type RoomStatus = 'lobby' | 'adding_songs' | 'downloading' | 'playing' | 'reveal' | 'finished';
 export type PlaybackMode = 'host_only' | 'all_players';
 export type AudioSource = 'youtube' | 'stream'; // youtube = with ads, stream = ad-free via yt-dlp
+export type ScoringMode = 'simple' | 'speed'; // simple = +1/-0, speed = time-based bonuses
 
 export interface RoomSettings {
   songsPerPlayer: number;
@@ -32,6 +39,7 @@ export interface RoomSettings {
   votingTime: number; // in seconds
   playbackMode: PlaybackMode;
   audioSource: AudioSource; // youtube = YouTube player (with ads), stream = yt-dlp streaming (ad-free)
+  scoringMode: ScoringMode; // simple = +1 per correct, speed = time & streak bonuses
 }
 
 export interface Room {
@@ -149,6 +157,10 @@ export const AVATARS = [
   'avatar_6',
   'avatar_7',
   'avatar_8',
+  'avatar_9',
+  'avatar_10',
+  'avatar_11',
+  'avatar_12',
 ] as const;
 
 export type AvatarType = typeof AVATARS[number];
@@ -163,4 +175,8 @@ export const AVATAR_EMOJIS: Record<string, string> = {
   avatar_6: '🎻',
   avatar_7: '🎷',
   avatar_8: '🎵',
+  avatar_9: '🎧',
+  avatar_10: '🎶',
+  avatar_11: '🎙️',
+  avatar_12: '🪘',
 };

@@ -54,7 +54,7 @@ const PlayerItem = React.memo<PlayerItemProps>(({
               </View>
             )}
             {isCurrentUser && !isHost && (
-              <Text style={styles.youText}>(You)</Text>
+              <Text style={styles.youText}>(Ty)</Text>
             )}
           </View>
 
@@ -119,7 +119,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Players</Text>
+        <Text style={styles.title}>Gracze</Text>
         <Text style={styles.count}>{players.length}</Text>
       </View>
 

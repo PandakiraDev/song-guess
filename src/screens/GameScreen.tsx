@@ -64,8 +64,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
   useEffect(() => {
     if (roomDeleted) {
       Alert.alert(
-        'Game Ended',
-        'The host has closed the room.',
+        'Gra zakończona',
+        'Host zamknął pokój.',
         [{ text: 'OK', onPress: () => navigation.replace('Home') }],
         { cancelable: false }
       );
@@ -152,7 +152,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading game...</Text>
+          <Text style={styles.loadingText}>Ładowanie gry...</Text>
         </View>
       </SafeAreaView>
     );
@@ -167,7 +167,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
       <View style={styles.header}>
         <View style={styles.songProgress}>
           <Text style={styles.songProgressText}>
-            Song {currentSongIndex + 1} of {totalSongs}
+            Piosenka {currentSongIndex + 1} z {totalSongs}
           </Text>
         </View>
 
@@ -239,7 +239,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
           <View style={styles.videoPlaceholder}>
             <Ionicons name="musical-notes" size={48} color={colors.neonPink} />
             <Text style={styles.videoPlaceholderText}>
-              {isHost ? 'Click "Start Round" to begin' : 'Waiting for host...'}
+              {isHost ? 'Kliknij "Rozpocznij rundę" aby zacząć' : 'Czekam na hosta...'}
             </Text>
           </View>
         )}
@@ -257,7 +257,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
         {/* Start Round Button (Host only, before playback starts) */}
         {!playbackStarted && !isRevealing && isHost && (
           <Button
-            title="Start Round"
+            title="Rozpocznij rundę"
             onPress={handleStartRound}
             size="large"
             fullWidth
@@ -270,7 +270,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
           <Card style={styles.waitingCard}>
             <Ionicons name="hourglass" size={24} color={colors.neonBlue} />
             <Text style={styles.waitingText}>
-              Waiting for host to start the round...
+              Czekam aż host rozpocznie rundę...
             </Text>
           </Card>
         )}
@@ -288,8 +288,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
                 />
                 <Text style={styles.loadingStatusTitle}>
                   {hostContentReady
-                    ? 'Starting...'
-                    : isHost ? 'Loading video...' : 'Waiting for host...'
+                    ? 'Rozpoczynanie...'
+                    : isHost ? 'Ładowanie wideo...' : 'Czekam na hosta...'
                   }
                 </Text>
               </View>
@@ -304,8 +304,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
                   />
                   <Text style={styles.loadingStatusTitle}>
                     {allPlayersContentReady
-                      ? 'Starting...'
-                      : 'Waiting for players'
+                      ? 'Rozpoczynanie...'
+                      : 'Czekam na graczy'
                     }
                   </Text>
                   <Text style={styles.loadingStatusCount}>
@@ -338,7 +338,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
                         styles.playerStatusLabel,
                         { color: player.contentPlaying ? colors.success : colors.warning }
                       ]}>
-                        {player.contentPlaying ? 'Ready' : 'Ad'}
+                        {player.contentPlaying ? 'Gotowy' : 'Reklama'}
                       </Text>
                     </View>
                   ))}
@@ -353,7 +353,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
           <Card style={styles.ownSongCard}>
             <Ionicons name="information-circle" size={24} color={colors.neonBlue} />
             <Text style={styles.ownSongText}>
-              This is your song! Watch others guess...
+              To Twoja piosenka! Obserwuj jak inni zgadują...
             </Text>
           </Card>
         )}
@@ -377,8 +377,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
             <Ionicons name="checkmark-circle" size={24} color={colors.success} />
             <Text style={styles.votedText}>
               {allPlayersVoted
-                ? 'Everyone voted! Revealing soon...'
-                : 'Vote submitted! Waiting for others...'}
+                ? 'Wszyscy zagłosowali! Zaraz odsłonięcie...'
+                : 'Głos oddany! Czekam na innych...'}
             </Text>
           </Card>
         )}
@@ -388,7 +388,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
           <Card style={styles.allVotedCard}>
             <Ionicons name="people" size={24} color={colors.neonGreen} />
             <Text style={styles.allVotedText}>
-              Everyone voted! Revealing soon...
+              Wszyscy zagłosowali! Zaraz odsłonięcie...
             </Text>
           </Card>
         )}

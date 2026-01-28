@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../theme/colors';
-import { RoomSettings as RoomSettingsType, PlaybackMode, AudioSource } from '../../types';
+import { RoomSettings as RoomSettingsType, PlaybackMode, AudioSource, ScoringMode } from '../../types';
 import { Card } from '../common';
 
 interface RoomSettingsProps {
@@ -54,7 +54,7 @@ export const RoomSettingsComponent: React.FC<RoomSettingsProps> = ({
   const durationOptions = [
     { label: '30s', value: 30 },
     { label: '1 min', value: 60 },
-    { label: 'Full', value: 0 },
+    { label: 'Cała', value: 0 },
   ];
   const votingTimeOptions = [
     { label: '10s', value: 10 },
@@ -63,23 +63,27 @@ export const RoomSettingsComponent: React.FC<RoomSettingsProps> = ({
     { label: '30s', value: 30 },
   ];
   const playbackModeOptions: { label: string; value: PlaybackMode; icon: string }[] = [
-    { label: 'Host Only', value: 'host_only', icon: 'person' },
-    { label: 'All Players', value: 'all_players', icon: 'people' },
+    { label: 'Tylko host', value: 'host_only', icon: 'person' },
+    { label: 'Wszyscy', value: 'all_players', icon: 'people' },
   ];
   const audioSourceOptions: { label: string; value: AudioSource; icon: string; description: string }[] = [
-    { label: 'YouTube', value: 'youtube', icon: 'logo-youtube', description: 'Standard (may have ads)' },
-    { label: 'Stream', value: 'stream', icon: 'cloud-download', description: 'Ad-free (requires server)' },
+    { label: 'YouTube', value: 'youtube', icon: 'logo-youtube', description: 'Standardowy (mogą być reklamy)' },
+    { label: 'Stream', value: 'stream', icon: 'cloud-download', description: 'Bez reklam (wymaga serwera)' },
+  ];
+  const scoringModeOptions: { label: string; value: ScoringMode; icon: string; description: string }[] = [
+    { label: 'Zwykła', value: 'simple', icon: 'checkmark-circle', description: '+1 za poprawną odpowiedź' },
+    { label: 'Szybkościowa', value: 'speed', icon: 'speedometer', description: 'Bonusy za czas i serię' },
   ];
 
   return (
     <Card style={styles.container}>
-      <Text style={styles.title}>Game Settings</Text>
+      <Text style={styles.title}>Ustawienia gry</Text>
 
       {/* Songs per player */}
       <View style={styles.settingGroup}>
         <View style={styles.settingHeader}>
           <Ionicons name="musical-notes" size={20} color={colors.neonPink} />
-          <Text style={styles.settingLabel}>Songs per player</Text>
+          <Text style={styles.settingLabel}>Piosenki na gracza</Text>
         </View>
         <View style={styles.optionsRow}>
           {songsOptions.map((num) => (
@@ -98,7 +102,7 @@ export const RoomSettingsComponent: React.FC<RoomSettingsProps> = ({
       <View style={styles.settingGroup}>
         <View style={styles.settingHeader}>
           <Ionicons name="time" size={20} color={colors.neonBlue} />
-          <Text style={styles.settingLabel}>Playback duration</Text>
+          <Text style={styles.settingLabel}>Czas odtwarzania</Text>
         </View>
         <View style={styles.optionsRow}>
           {durationOptions.map((option) => (
@@ -117,7 +121,7 @@ export const RoomSettingsComponent: React.FC<RoomSettingsProps> = ({
       <View style={styles.settingGroup}>
         <View style={styles.settingHeader}>
           <Ionicons name="hand-left" size={20} color={colors.neonGreen} />
-          <Text style={styles.settingLabel}>Voting time</Text>
+          <Text style={styles.settingLabel}>Czas głosowania</Text>
         </View>
         <View style={styles.optionsRow}>
           {votingTimeOptions.map((option) => (
@@ -136,7 +140,7 @@ export const RoomSettingsComponent: React.FC<RoomSettingsProps> = ({
       <View style={styles.settingGroup}>
         <View style={styles.settingHeader}>
           <Ionicons name="volume-high" size={20} color={colors.neonPurple} />
-          <Text style={styles.settingLabel}>Playback mode</Text>
+          <Text style={styles.settingLabel}>Tryb odtwarzania</Text>
         </View>
         <View style={styles.optionsRow}>
           {playbackModeOptions.map((option) => (
@@ -173,11 +177,55 @@ export const RoomSettingsComponent: React.FC<RoomSettingsProps> = ({
         </View>
       </View>
 
+      {/* Scoring mode */}
+      <View style={styles.settingGroup}>
+        <View style={styles.settingHeader}>
+          <Ionicons name="trophy" size={20} color={colors.warning} />
+          <Text style={styles.settingLabel}>Punktacja</Text>
+        </View>
+        <View style={styles.optionsRow}>
+          {scoringModeOptions.map((option) => (
+            <TouchableOpacity
+              key={option.value}
+              onPress={() => onUpdate({ scoringMode: option.value })}
+              disabled={disabled}
+              style={[
+                styles.sourceButton,
+                settings.scoringMode === option.value && styles.scoringButtonSelected,
+                disabled && styles.optionButtonDisabled,
+              ]}
+            >
+              <Ionicons
+                name={option.icon as any}
+                size={20}
+                color={
+                  settings.scoringMode === option.value
+                    ? colors.warning
+                    : colors.textSecondary
+                }
+              />
+              <View style={styles.sourceTextContainer}>
+                <Text
+                  style={[
+                    styles.modeText,
+                    settings.scoringMode === option.value && styles.scoringTextSelected,
+                    disabled && styles.optionTextDisabled,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+                <Text style={styles.sourceDescription}>{option.description}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
       {/* Audio source */}
       <View style={styles.settingGroup}>
         <View style={styles.settingHeader}>
           <Ionicons name="musical-note" size={20} color={colors.neonBlue} />
-          <Text style={styles.settingLabel}>Audio source</Text>
+          <Text style={styles.settingLabel}>Źródło audio</Text>
         </View>
         <View style={styles.optionsRow}>
           {audioSourceOptions.map((option) => (
@@ -325,6 +373,13 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: fontSize.xs,
     marginTop: 2,
+  },
+  scoringButtonSelected: {
+    backgroundColor: colors.warning + '20',
+    borderColor: colors.warning,
+  },
+  scoringTextSelected: {
+    color: colors.warning,
   },
 });
 

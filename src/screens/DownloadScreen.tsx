@@ -52,8 +52,8 @@ export const DownloadScreen: React.FC<DownloadScreenProps> = ({
   useEffect(() => {
     if (roomDeleted && !isHost) {
       Alert.alert(
-        'Game Ended',
-        'The host has closed the room.',
+        'Gra zakończona',
+        'Host zamknął pokój.',
         [{ text: 'OK', onPress: () => navigation.replace('Home') }],
         { cancelable: false }
       );
@@ -169,18 +169,18 @@ export const DownloadScreen: React.FC<DownloadScreenProps> = ({
       });
     } catch (error) {
       console.error('Failed to start game:', error);
-      Alert.alert('Error', 'Failed to start game. Please try again.');
+      Alert.alert('Błąd', 'Nie udało się rozpocząć gry. Spróbuj ponownie.');
     }
   };
 
   const handleSkipDownload = async () => {
     Alert.alert(
-      'Skip Download',
-      'This will use YouTube playback instead (with ads). Continue?',
+      'Pomiń pobieranie',
+      'Zostanie użyte odtwarzanie YouTube (z reklamami). Kontynuować?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Anuluj', style: 'cancel' },
         {
-          text: 'Continue',
+          text: 'Kontynuuj',
           onPress: async () => {
             if (roomId && isHost) {
               await updateDoc(doc(db, 'rooms', roomId), {
@@ -198,9 +198,9 @@ export const DownloadScreen: React.FC<DownloadScreenProps> = ({
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.waitingContainer}>
-          <Text style={styles.waitingTitle}>Preparing Game</Text>
+          <Text style={styles.waitingTitle}>Przygotowywanie gry</Text>
           <Text style={styles.waitingSubtitle}>
-            Waiting for host to start download server...
+            Czekam aż host uruchomi serwer pobierania...
           </Text>
           <View style={styles.loadingDots}>
             <View style={styles.dot} />
@@ -217,12 +217,12 @@ export const DownloadScreen: React.FC<DownloadScreenProps> = ({
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
-          {isHost ? 'Downloading Songs' : 'Downloading Songs'}
+          Pobieranie piosenek
         </Text>
         <Text style={styles.headerSubtitle}>
           {isHost
-            ? 'Please wait while songs are downloaded...'
-            : `Downloading from host server...`
+            ? 'Proszę czekać, trwa pobieranie piosenek...'
+            : 'Pobieranie z serwera hosta...'
           }
         </Text>
       </View>
@@ -233,28 +233,28 @@ export const DownloadScreen: React.FC<DownloadScreenProps> = ({
         {downloadComplete && !hasError ? (
           isHost ? (
             <Button
-              title="Start Game"
+              title="Rozpocznij grę"
               onPress={handleStartGame}
               size="large"
               fullWidth
             />
           ) : (
             <View style={styles.waitingForHost}>
-              <Text style={styles.readyText}>Download complete!</Text>
-              <Text style={styles.waitingText}>Waiting for host to start...</Text>
+              <Text style={styles.readyText}>Pobieranie zakończone!</Text>
+              <Text style={styles.waitingText}>Czekam aż host rozpocznie...</Text>
             </View>
           )
         ) : hasError ? (
           <View style={styles.errorButtons}>
             <Button
-              title="Retry Download"
+              title="Ponów pobieranie"
               onPress={handleRetry}
               size="large"
               fullWidth
             />
             {isHost && (
               <Button
-                title="Skip (Use YouTube)"
+                title="Pomiń (użyj YouTube)"
                 onPress={handleSkipDownload}
                 variant="outline"
                 size="large"
@@ -265,11 +265,11 @@ export const DownloadScreen: React.FC<DownloadScreenProps> = ({
         ) : (
           <View style={styles.downloadingInfo}>
             <Text style={styles.downloadingText}>
-              {isDownloading ? 'Downloading...' : 'Preparing...'}
+              {isDownloading ? 'Pobieranie...' : 'Przygotowywanie...'}
             </Text>
             {isHost && (
               <Button
-                title="Skip Download"
+                title="Pomiń pobieranie"
                 onPress={handleSkipDownload}
                 variant="ghost"
                 size="small"

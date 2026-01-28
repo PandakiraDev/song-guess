@@ -23,7 +23,7 @@ type AuthScreenProps = {
 type AuthMode = 'guest' | 'login' | 'register';
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
-  const { signInAsGuest, signIn, signUp, isLoading } = useAuth();
+  const { signInAsGuest, signIn, signUp, signInGoogle, isLoading } = useAuth();
 
   const [mode, setMode] = useState<AuthMode>('guest');
   const [nickname, setNickname] = useState('');
@@ -34,7 +34,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
 
   const handleGuestLogin = () => {
     if (!nickname.trim()) {
-      setError('Please enter a nickname');
+      setError('Wpisz pseudonim');
       return;
     }
 
@@ -44,7 +44,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
 
   const handleEmailLogin = async () => {
     if (!email.trim() || !password) {
-      setError('Please fill in all fields');
+      setError('Wypełnij wszystkie pola');
       return;
     }
 
@@ -54,48 +54,46 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
       if (user) {
         navigation.goBack();
       } else {
-        setError('Login failed. Please check your credentials.');
+        setError('Logowanie nie powiodło się. Sprawdź dane logowania.');
       }
     } catch (err: any) {
       console.error('Login error:', err);
-      // Firebase errors have a 'code' property
       const errorCode = err?.code || '';
       const errorMessage = err?.message || '';
 
       if (errorCode === 'auth/invalid-credential' || errorCode === 'auth/wrong-password') {
-        setError('Invalid email or password');
+        setError('Nieprawidłowy email lub hasło');
       } else if (errorCode === 'auth/user-not-found') {
-        setError('No account found with this email');
+        setError('Nie znaleziono konta z tym adresem email');
       } else if (errorCode === 'auth/invalid-email') {
-        setError('Invalid email address');
+        setError('Nieprawidłowy adres email');
       } else if (errorCode === 'auth/too-many-requests') {
-        setError('Too many failed attempts. Please try again later.');
+        setError('Zbyt wiele prób. Spróbuj ponownie później.');
       } else if (errorCode === 'auth/network-request-failed') {
-        setError('Network error. Please check your connection.');
+        setError('Błąd sieci. Sprawdź połączenie internetowe.');
       } else if (errorMessage.includes('invalid-credential') || errorMessage.includes('wrong-password')) {
-        // Fallback: check message string
-        setError('Invalid email or password');
+        setError('Nieprawidłowy email lub hasło');
       } else if (errorMessage.includes('user-not-found')) {
-        setError('No account found with this email');
+        setError('Nie znaleziono konta z tym adresem email');
       } else {
-        setError('Login failed. Please check your credentials and try again.');
+        setError('Logowanie nie powiodło się. Spróbuj ponownie.');
       }
     }
   };
 
   const handleRegister = async () => {
     if (!nickname.trim() || !email.trim() || !password || !confirmPassword) {
-      setError('Please fill in all fields');
+      setError('Wypełnij wszystkie pola');
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError('Hasła nie pasują do siebie');
       return;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError('Hasło musi mieć co najmniej 6 znaków');
       return;
     }
 
@@ -105,42 +103,69 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
       if (user) {
         navigation.goBack();
       } else {
-        setError('Registration failed. Please try again.');
+        setError('Rejestracja nie powiodła się. Spróbuj ponownie.');
       }
     } catch (err: any) {
       console.error('Registration error:', err);
-      // Firebase errors have a 'code' property
       const errorCode = err?.code || '';
       const errorMessage = err?.message || '';
 
       if (errorCode === 'auth/email-already-in-use') {
-        setError('This email is already registered');
+        setError('Ten email jest już zarejestrowany');
       } else if (errorCode === 'auth/invalid-email') {
-        setError('Invalid email address');
+        setError('Nieprawidłowy adres email');
       } else if (errorCode === 'auth/weak-password') {
-        setError('Password is too weak. Use at least 6 characters.');
+        setError('Hasło jest za słabe. Użyj co najmniej 6 znaków.');
       } else if (errorCode === 'auth/network-request-failed') {
-        setError('Network error. Please check your connection.');
+        setError('Błąd sieci. Sprawdź połączenie internetowe.');
       } else if (errorMessage.includes('email-already-in-use')) {
-        setError('This email is already registered');
+        setError('Ten email jest już zarejestrowany');
       } else if (errorMessage.includes('permission')) {
-        setError('Database error. Please contact support.');
+        setError('Błąd bazy danych. Skontaktuj się z pomocą techniczną.');
       } else {
-        setError('Registration failed. Please try again.');
+        setError('Rejestracja nie powiodła się. Spróbuj ponownie.');
       }
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    try {
+      setError(null);
+      const userData = await signInGoogle();
+      if (userData) {
+        navigation.goBack();
+      }
+    } catch (err: any) {
+      console.error('Google sign-in error:', err);
+      if (err?.code === 'SIGN_IN_CANCELLED' || err?.code === '12501') return;
+      setError('Logowanie przez Google nie powiodło się. Spróbuj ponownie.');
+    }
+  };
+
+  const renderGoogleButton = () => (
+    <View style={styles.googleSection}>
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>lub</Text>
+        <View style={styles.dividerLine} />
+      </View>
+      <TouchableOpacity style={styles.googleButton} onPress={handleGoogleSignIn}>
+        <Ionicons name="logo-google" size={20} color={colors.textPrimary} />
+        <Text style={styles.googleButtonText}>Kontynuuj z Google</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   const renderGuestMode = () => (
     <View style={styles.form}>
-      <Text style={styles.modeTitle}>Play as Guest</Text>
+      <Text style={styles.modeTitle}>Graj jako gość</Text>
       <Text style={styles.modeDescription}>
-        Enter a nickname to start playing. Your stats won't be saved.
+        Wpisz pseudonim, aby zacząć grać. Statystyki nie będą zapisywane.
       </Text>
 
       <Input
-        label="Nickname"
-        placeholder="Enter your nickname"
+        label="Pseudonim"
+        placeholder="Wpisz pseudonim"
         value={nickname}
         onChangeText={setNickname}
         icon="person"
@@ -148,7 +173,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
       />
 
       <Button
-        title="Continue as Guest"
+        title="Kontynuuj jako gość"
         onPress={handleGuestLogin}
         loading={isLoading}
         fullWidth
@@ -158,14 +183,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
 
   const renderLoginMode = () => (
     <View style={styles.form}>
-      <Text style={styles.modeTitle}>Welcome Back</Text>
+      <Text style={styles.modeTitle}>Witaj ponownie</Text>
       <Text style={styles.modeDescription}>
-        Sign in to track your stats and compete with friends.
+        Zaloguj się, aby śledzić statystyki i rywalizować ze znajomymi.
       </Text>
 
       <Input
         label="Email"
-        placeholder="Enter your email"
+        placeholder="Wpisz email"
         value={email}
         onChangeText={setEmail}
         icon="mail"
@@ -174,8 +199,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
       />
 
       <Input
-        label="Password"
-        placeholder="Enter your password"
+        label="Hasło"
+        placeholder="Wpisz hasło"
         value={password}
         onChangeText={setPassword}
         icon="lock-closed"
@@ -183,24 +208,26 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
       />
 
       <Button
-        title="Sign In"
+        title="Zaloguj się"
         onPress={handleEmailLogin}
         loading={isLoading}
         fullWidth
       />
+
+      {renderGoogleButton()}
     </View>
   );
 
   const renderRegisterMode = () => (
     <View style={styles.form}>
-      <Text style={styles.modeTitle}>Create Account</Text>
+      <Text style={styles.modeTitle}>Utwórz konto</Text>
       <Text style={styles.modeDescription}>
-        Sign up to save your stats and climb the leaderboard.
+        Zarejestruj się, aby zapisywać statystyki i wspinać się w rankingu.
       </Text>
 
       <Input
-        label="Nickname"
-        placeholder="Choose a nickname"
+        label="Pseudonim"
+        placeholder="Wybierz pseudonim"
         value={nickname}
         onChangeText={setNickname}
         icon="person"
@@ -209,7 +236,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
 
       <Input
         label="Email"
-        placeholder="Enter your email"
+        placeholder="Wpisz email"
         value={email}
         onChangeText={setEmail}
         icon="mail"
@@ -218,8 +245,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
       />
 
       <Input
-        label="Password"
-        placeholder="Create a password"
+        label="Hasło"
+        placeholder="Utwórz hasło"
         value={password}
         onChangeText={setPassword}
         icon="lock-closed"
@@ -227,8 +254,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
       />
 
       <Input
-        label="Confirm Password"
-        placeholder="Confirm your password"
+        label="Potwierdź hasło"
+        placeholder="Potwierdź hasło"
         value={confirmPassword}
         onChangeText={setConfirmPassword}
         icon="lock-closed"
@@ -236,11 +263,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
       />
 
       <Button
-        title="Create Account"
+        title="Utwórz konto"
         onPress={handleRegister}
         loading={isLoading}
         fullWidth
       />
+
+      {renderGoogleButton()}
     </View>
   );
 
@@ -274,7 +303,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
               <Text
                 style={[styles.tabText, mode === 'guest' && styles.tabTextActive]}
               >
-                Guest
+                Gość
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -284,7 +313,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
               <Text
                 style={[styles.tabText, mode === 'login' && styles.tabTextActive]}
               >
-                Login
+                Logowanie
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -294,7 +323,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
               <Text
                 style={[styles.tabText, mode === 'register' && styles.tabTextActive]}
               >
-                Register
+                Rejestracja
               </Text>
             </TouchableOpacity>
           </View>
@@ -399,6 +428,40 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     textAlign: 'center',
     marginBottom: spacing.md,
+  },
+  googleSection: {
+    gap: spacing.md,
+    marginTop: spacing.sm,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.surfaceLight,
+  },
+  dividerText: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.surfaceLight,
+    backgroundColor: colors.surface,
+  },
+  googleButtonText: {
+    color: colors.textPrimary,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
   },
 });
 

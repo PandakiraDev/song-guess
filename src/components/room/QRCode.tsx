@@ -17,7 +17,7 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
 }) => {
   return (
     <Card variant="neon" neonColor="blue" style={styles.container}>
-      <Text style={styles.title}>Scan to Join</Text>
+      <Text style={styles.title}>Skanuj aby dołączyć</Text>
 
       <View style={styles.qrContainer}>
         <QRCodeSVG
@@ -29,7 +29,7 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
       </View>
 
       <View style={styles.codeContainer}>
-        <Text style={styles.codeLabel}>Room Code</Text>
+        <Text style={styles.codeLabel}>Kod pokoju</Text>
         <Text style={styles.code}>{roomCode}</Text>
       </View>
     </Card>

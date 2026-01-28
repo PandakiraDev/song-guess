@@ -49,15 +49,15 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
       navigation.replace('JoinRoom', { code: roomCode });
     } else {
       Alert.alert(
-        'Invalid QR Code',
-        'This QR code is not a valid SongGuess room code.',
+        'Nieprawidłowy kod QR',
+        'Ten kod QR nie jest prawidłowym kodem pokoju SongGuess.',
         [
           {
-            text: 'Scan Again',
+            text: 'Skanuj ponownie',
             onPress: () => setScanned(false),
           },
           {
-            text: 'Cancel',
+            text: 'Anuluj',
             onPress: () => navigation.goBack(),
           },
         ]
@@ -69,7 +69,7 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centerContent}>
-          <Text style={styles.message}>Requesting camera permission...</Text>
+          <Text style={styles.message}>Proszę o dostęp do kamery...</Text>
         </View>
       </SafeAreaView>
     );
@@ -85,22 +85,22 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
           >
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.title}>Scan QR Code</Text>
+          <Text style={styles.title}>Skanuj kod QR</Text>
         </View>
 
         <View style={styles.centerContent}>
           <Card style={styles.permissionCard}>
             <Ionicons name="camera-outline" size={48} color={colors.error} />
-            <Text style={styles.permissionTitle}>Camera Access Required</Text>
+            <Text style={styles.permissionTitle}>Wymagany dostęp do kamery</Text>
             <Text style={styles.permissionText}>
-              Please enable camera access to scan QR codes.
+              Włącz dostęp do kamery, aby skanować kody QR.
             </Text>
             <Button
-              title="Grant Permission"
+              title="Przyznaj uprawnienie"
               onPress={requestPermission}
             />
             <Button
-              title="Enter Code Manually"
+              title="Wpisz kod ręcznie"
               variant="outline"
               onPress={() => navigation.replace('JoinRoom', {})}
             />
@@ -120,7 +120,7 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Scan QR Code</Text>
+        <Text style={styles.title}>Skanuj kod QR</Text>
       </View>
 
       {/* Scanner */}
@@ -149,7 +149,7 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
           </View>
           <View style={styles.overlayBottom}>
             <Text style={styles.instructions}>
-              Point your camera at a SongGuess QR code
+              Skieruj kamerę na kod QR SongGuess
             </Text>
           </View>
         </View>
@@ -158,7 +158,7 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
       {/* Manual Entry Option */}
       <View style={styles.footer}>
         <Button
-          title="Enter Code Manually"
+          title="Wpisz kod ręcznie"
           variant="outline"
           onPress={() => navigation.replace('JoinRoom', {})}
           fullWidth

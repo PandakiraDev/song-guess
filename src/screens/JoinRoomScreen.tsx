@@ -100,18 +100,18 @@ export const JoinRoomScreen: React.FC<JoinRoomScreenProps> = ({
           >
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.title}>Join Room</Text>
+          <Text style={styles.title}>Dołącz do pokoju</Text>
         </View>
 
         <View style={styles.content}>
           <Card style={styles.authPrompt}>
             <Ionicons name="person-circle" size={64} color={colors.neonBlue} />
-            <Text style={styles.authTitle}>Sign In Required</Text>
+            <Text style={styles.authTitle}>Wymagane logowanie</Text>
             <Text style={styles.authDescription}>
-              You need to sign in or play as a guest to join a room.
+              Musisz się zalogować lub grać jako gość, aby dołączyć do pokoju.
             </Text>
             <Button
-              title="Continue"
+              title="Kontynuuj"
               onPress={() => navigation.navigate('Auth')}
               fullWidth
             />
@@ -130,20 +130,20 @@ export const JoinRoomScreen: React.FC<JoinRoomScreenProps> = ({
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Join Room</Text>
+        <Text style={styles.title}>Dołącz do pokoju</Text>
       </View>
 
       <View style={styles.content}>
         <Card style={styles.infoCard}>
           <Ionicons name="information-circle" size={24} color={colors.neonBlue} />
           <Text style={styles.infoText}>
-            Enter the 6-digit room code shared by the host to join the game.
+            Wpisz 6-cyfrowy kod pokoju udostępniony przez hosta, aby dołączyć do gry.
           </Text>
         </Card>
 
         {/* Code Input */}
         <View style={styles.codeInputContainer}>
-          <Text style={styles.label}>Room Code</Text>
+          <Text style={styles.label}>Kod pokoju</Text>
           <Pressable onPress={focusInput}>
             <View style={styles.codeDisplay}>
               {[0, 1, 2, 3, 4, 5].map((index) => (
@@ -175,7 +175,7 @@ export const JoinRoomScreen: React.FC<JoinRoomScreenProps> = ({
         {isLoading && code.length === 6 && (
           <Card style={styles.loadingCard}>
             <Ionicons name="hourglass" size={24} color={colors.neonBlue} />
-            <Text style={styles.loadingText}>Joining room...</Text>
+            <Text style={styles.loadingText}>Dołączanie do pokoju...</Text>
           </Card>
         )}
 
@@ -193,7 +193,7 @@ export const JoinRoomScreen: React.FC<JoinRoomScreenProps> = ({
             onPress={() => navigation.navigate('QRScanner')}
           >
             <Ionicons name="qr-code" size={24} color={colors.neonBlue} />
-            <Text style={styles.scanText}>Or scan QR code</Text>
+            <Text style={styles.scanText}>Lub skanuj kod QR</Text>
           </TouchableOpacity>
         )}
 
@@ -201,7 +201,7 @@ export const JoinRoomScreen: React.FC<JoinRoomScreenProps> = ({
         {error && !isLoading && (
           <View style={styles.actions}>
             <Button
-              title="Try Again"
+              title="Spróbuj ponownie"
               onPress={handleRetry}
               size="large"
               fullWidth
