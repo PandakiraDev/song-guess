@@ -96,6 +96,12 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [isAddingSong, setIsAddingSong] = useState(false);
   const [isAddingTestSongs, setIsAddingTestSongs] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Force refresh progress when songs change
+  useEffect(() => {
+    setRefreshKey(prev => prev + 1);
+  }, [songs.length]);
 
   // Handle room deletion (host left)
   useEffect(() => {
@@ -347,12 +353,12 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
       )}
 
       {/* Player Progress */}
-      <View style={styles.playerProgress}>
-        <Text style={styles.sectionTitle}>Player Progress</Text>
+      <View style={styles.playerProgress} key={`progress-${refreshKey}`}>
+        <Text style={styles.sectionTitle}>Player Progress ({songs.length} songs total)</Text>
         <View style={styles.progressList}>
           {getPlayerProgress().map((player) => (
             <View key={player.id} style={styles.playerProgressItem}>
-              <Text style={styles.playerName}>{player.name}</Text>
+              <Text style={styles.playerName} numberOfLines={1}>{player.name}</Text>
               <View style={styles.progressBar}>
                 <View
                   style={[
@@ -366,6 +372,9 @@ export const AddSongsScreen: React.FC<AddSongsScreenProps> = ({
                   ]}
                 />
               </View>
+              <Text style={styles.progressCount}>
+                {player.songCount}/{requiredSongsCount}
+              </Text>
               {player.isComplete && (
                 <Ionicons name="checkmark" size={16} color={colors.success} />
               )}
@@ -560,7 +569,7 @@ const styles = StyleSheet.create({
   playerName: {
     color: colors.textPrimary,
     fontSize: fontSize.sm,
-    width: 80,
+    width: 70,
   },
   progressBar: {
     flex: 1,
@@ -572,6 +581,12 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     borderRadius: 4,
+  },
+  progressCount: {
+    color: colors.textSecondary,
+    fontSize: fontSize.xs,
+    width: 30,
+    textAlign: 'center',
   },
   footer: {
     padding: spacing.lg,

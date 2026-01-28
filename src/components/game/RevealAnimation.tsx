@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, Modal, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -7,9 +7,11 @@ import Animated, {
   withSequence,
   withDelay,
   withTiming,
+  Easing,
+  runOnJS,
+  interpolate,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../theme/colors';
 
 interface RevealAnimationProps {
@@ -21,6 +23,7 @@ interface RevealAnimationProps {
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const COUNTDOWN_DURATION = 3; // seconds
 
 export const RevealAnimation: React.FC<RevealAnimationProps> = ({
   isHost = false,
@@ -29,155 +32,172 @@ export const RevealAnimation: React.FC<RevealAnimationProps> = ({
   roundNumber = 1,
   totalRounds = 1,
 }) => {
+  const [countdown, setCountdown] = useState(COUNTDOWN_DURATION);
+
   // Animation values
   const containerOpacity = useSharedValue(0);
-  const cardScale = useSharedValue(0.8);
-  const cardOpacity = useSharedValue(0);
-  const iconScale = useSharedValue(0);
+  const contentScale = useSharedValue(0.5);
+  const progressValue = useSharedValue(0);
+  const pulseScale = useSharedValue(1);
+  const iconRotation = useSharedValue(0);
+  const exitScale = useSharedValue(1);
+  const exitOpacity = useSharedValue(1);
 
+  // Handle countdown and auto-transition
   useEffect(() => {
-    // Fade in container
-    containerOpacity.value = withTiming(1, { duration: 250 });
+    // Entrance animations
+    containerOpacity.value = withTiming(1, { duration: 300 });
+    contentScale.value = withSpring(1, { damping: 15, stiffness: 150 });
 
-    // Card entrance
-    cardOpacity.value = withTiming(1, { duration: 300 });
-    cardScale.value = withSpring(1, { damping: 18, stiffness: 200 });
+    // Progress bar animation
+    progressValue.value = withTiming(1, {
+      duration: COUNTDOWN_DURATION * 1000,
+      easing: Easing.linear,
+    });
 
-    // Icon animation
-    iconScale.value = withDelay(
-      200,
-      withSequence(
-        withSpring(1.15, { damping: 8, stiffness: 250 }),
-        withSpring(1, { damping: 12, stiffness: 150 })
-      )
-    );
-  }, []);
+    // Pulse animation for the icon
+    const pulseLoop = () => {
+      pulseScale.value = withSequence(
+        withTiming(1.1, { duration: 500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 500, easing: Easing.inOut(Easing.ease) })
+      );
+    };
+    pulseLoop();
+    const pulseInterval = setInterval(pulseLoop, 1000);
+
+    // Icon rotation
+    iconRotation.value = withTiming(360, {
+      duration: COUNTDOWN_DURATION * 1000,
+      easing: Easing.linear,
+    });
+
+    // Countdown timer
+    const countdownInterval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // Auto-transition after countdown (only host triggers)
+    const transitionTimeout = setTimeout(() => {
+      if (isHost && onNext) {
+        // Exit animation
+        exitScale.value = withTiming(1.1, { duration: 200 });
+        exitOpacity.value = withTiming(0, { duration: 300 }, () => {
+          runOnJS(onNext)();
+        });
+      }
+    }, COUNTDOWN_DURATION * 1000);
+
+    return () => {
+      clearInterval(pulseInterval);
+      clearInterval(countdownInterval);
+      clearTimeout(transitionTimeout);
+    };
+  }, [isHost, onNext]);
 
   // Animated styles
   const containerStyle = useAnimatedStyle(() => ({
-    opacity: containerOpacity.value,
+    opacity: containerOpacity.value * exitOpacity.value,
+    transform: [{ scale: exitScale.value }],
   }));
 
-  const cardStyle = useAnimatedStyle(() => ({
-    opacity: cardOpacity.value,
-    transform: [{ scale: cardScale.value }],
+  const contentStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: contentScale.value }],
   }));
 
-  const iconStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: iconScale.value }],
+  const iconContainerStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: pulseScale.value },
+      { rotate: `${iconRotation.value}deg` },
+    ],
+  }));
+
+  const progressBarStyle = useAnimatedStyle(() => ({
+    width: `${progressValue.value * 100}%`,
+  }));
+
+  const countdownStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progressValue.value, [0, 0.9, 1], [1, 1, 0]),
+    transform: [
+      {
+        scale: interpolate(progressValue.value, [0, 0.9, 1], [1, 1, 1.5]),
+      },
+    ],
   }));
 
   return (
-    <Modal
-      visible={true}
-      transparent
-      animationType="none"
-      statusBarTranslucent
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <Animated.View style={[styles.container, containerStyle]}>
-          <Animated.View style={[styles.card, cardStyle]}>
-            <LinearGradient
-              colors={[colors.neonPink + '20', colors.neonPink + '05']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.cardGradient}
-            >
-              {/* Content */}
-              <View style={styles.content}>
-                {/* Icon */}
-                <Animated.View style={[styles.iconWrapper, iconStyle]}>
-                  <View style={styles.iconLarge}>
-                    <Ionicons
-                      name="musical-notes"
-                      size={48}
-                      color={colors.background}
-                    />
-                  </View>
-                </Animated.View>
-
-                {/* Title */}
-                <Text style={styles.titleText}>
-                  Round Complete!
-                </Text>
-
-                {/* Progress */}
-                <Text style={styles.progressText}>
-                  {roundNumber} of {totalRounds} songs
-                </Text>
-
-                {/* Message */}
-                <Text style={styles.messageText}>
-                  {isLastSong
-                    ? 'All songs played! Ready to see the results?'
-                    : 'Get ready for the next song...'}
-                </Text>
-              </View>
-            </LinearGradient>
-          </Animated.View>
-
-          {/* Action Button */}
-          <View style={styles.footer}>
-            {isHost && onNext ? (
-              <TouchableOpacity style={styles.nextButton} onPress={onNext} activeOpacity={0.8}>
-                <Ionicons
-                  name={isLastSong ? 'trophy' : 'arrow-forward'}
-                  size={24}
-                  color={colors.background}
-                />
-                <Text style={styles.nextButtonText}>
-                  {isLastSong ? 'View Results' : 'Next Song'}
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.waitingBadge}>
-                <Ionicons name="hourglass" size={18} color={colors.neonBlue} />
-                <Text style={styles.waitingText}>Waiting for host...</Text>
-              </View>
-            )}
+    <Animated.View style={[styles.overlay, containerStyle]}>
+      <Animated.View style={[styles.content, contentStyle]}>
+        {/* Animated Icon */}
+        <Animated.View style={[styles.iconContainer, iconContainerStyle]}>
+          <View style={styles.iconInner}>
+            <Ionicons
+              name={isLastSong ? 'trophy' : 'musical-notes'}
+              size={40}
+              color={colors.background}
+            />
           </View>
         </Animated.View>
-      </ScrollView>
-    </Modal>
+
+        {/* Main Text */}
+        <Text style={styles.titleText}>
+          {isLastSong ? 'Wyniki!' : 'Następna piosenka'}
+        </Text>
+
+        {/* Round Progress */}
+        <Text style={styles.progressText}>
+          {isLastSong
+            ? 'Zobaczmy kto wygrał...'
+            : `Runda ${roundNumber + 1} z ${totalRounds}`}
+        </Text>
+
+        {/* Countdown */}
+        <Animated.View style={[styles.countdownContainer, countdownStyle]}>
+          <Text style={styles.countdownText}>
+            {countdown > 0 ? countdown : ''}
+          </Text>
+        </Animated.View>
+
+        {/* Progress Bar */}
+        <View style={styles.progressBarContainer}>
+          <Animated.View style={[styles.progressBar, progressBarStyle]} />
+        </View>
+
+        {/* Waiting indicator for non-host */}
+        {!isHost && (
+          <View style={styles.waitingContainer}>
+            <Ionicons name="sync" size={16} color={colors.textMuted} />
+            <Text style={styles.waitingText}>Synchronizacja...</Text>
+          </View>
+        )}
+      </Animated.View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  scrollContent: {
-    flexGrow: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
-  },
-  container: {
-    flex: 1,
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10, 10, 15, 0.98)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.lg,
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.xxl,
+    zIndex: 1000,
   },
-  card: {
-    width: '100%',
-    maxWidth: SCREEN_WIDTH - 48,
-    borderRadius: borderRadius.xl,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.surface,
-    backgroundColor: colors.card,
-  },
-  cardGradient: {},
   content: {
     alignItems: 'center',
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
-    gap: spacing.md,
+    padding: spacing.xl,
+    width: '100%',
+    maxWidth: 300,
   },
-  iconWrapper: {
-    marginBottom: spacing.sm,
+  iconContainer: {
+    marginBottom: spacing.lg,
   },
-  iconLarge: {
+  iconInner: {
     width: 80,
     height: 80,
     borderRadius: 40,
@@ -186,63 +206,61 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: colors.neonPink,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 15,
-    elevation: 8,
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    elevation: 10,
   },
   titleText: {
     fontSize: fontSize.xxl,
     fontWeight: fontWeight.bold,
     color: colors.textPrimary,
     textAlign: 'center',
+    marginBottom: spacing.xs,
   },
   progressText: {
     fontSize: fontSize.md,
-    color: colors.neonPink,
-    fontWeight: fontWeight.medium,
-  },
-  messageText: {
     color: colors.textSecondary,
-    fontSize: fontSize.sm,
     textAlign: 'center',
-    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
   },
-  footer: {
-    width: '100%',
-    maxWidth: SCREEN_WIDTH - 48,
-    marginTop: spacing.lg,
-  },
-  nextButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  countdownContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.surface,
     justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.neonPink,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    borderWidth: 2,
+    borderColor: colors.neonPink,
   },
-  nextButtonText: {
-    color: colors.background,
-    fontSize: fontSize.lg,
+  countdownText: {
+    fontSize: 28,
     fontWeight: fontWeight.bold,
+    color: colors.neonPink,
   },
-  waitingBadge: {
+  progressBarContainer: {
+    width: '100%',
+    height: 4,
+    backgroundColor: colors.surface,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: colors.neonPink,
+    borderRadius: 2,
+  },
+  waitingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.neonBlue + '20',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.neonBlue,
+    gap: spacing.xs,
+    marginTop: spacing.lg,
+    opacity: 0.6,
   },
   waitingText: {
-    color: colors.neonBlue,
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.medium,
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
   },
 });
 

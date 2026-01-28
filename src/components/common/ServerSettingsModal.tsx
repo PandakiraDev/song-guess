@@ -115,8 +115,8 @@ export const ServerSettingsModal: React.FC<ServerSettingsModalProps> = ({
             <View style={styles.infoBox}>
               <Ionicons name="information-circle" size={20} color={colors.neonBlue} />
               <Text style={styles.infoText}>
-                Wpisz adres IP telefonu z serwerem (Termux).{'\n'}
-                Znajdziesz go w: Ustawienia → WiFi → szczegóły sieci
+                Wpisz adres IP telefonu na którym działa serwer (Termux).{'\n'}
+                Oba urządzenia muszą być w tej samej sieci WiFi.
               </Text>
             </View>
 
@@ -189,12 +189,16 @@ export const ServerSettingsModal: React.FC<ServerSettingsModalProps> = ({
 
             {/* Help */}
             <View style={styles.helpBox}>
-              <Text style={styles.helpTitle}>Jak znaleźć IP?</Text>
+              <Text style={styles.helpTitle}>Jak znaleźć adres IP?</Text>
               <Text style={styles.helpText}>
-                Na telefonie z Termuxem:{'\n'}
-                • Otwórz Termux{'\n'}
-                • Wpisz: ip addr | grep inet{'\n'}
-                • Szukaj adresu zaczynającego się od 192.168.x.x lub 10.x.x.x
+                Na telefonie z serwerem:{'\n'}
+                {'  '}Ustawienia → Informacje → Informacje{'\n'}
+                {'  '}o stanie → Adres IP{'\n'}
+                {'\n'}
+                Lub w Termux wpisz:{'\n'}
+                {'  '}ip addr | grep inet{'\n'}
+                {'\n'}
+                Szukaj adresu typu 192.168.x.x
               </Text>
             </View>
           </ScrollView>

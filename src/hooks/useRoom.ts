@@ -31,6 +31,7 @@ export const useRoom = (roomId?: string) => {
   const hadRoomRef = useRef(false);
   const mountedRef = useRef(true);
   const initialLoadRef = useRef(true);
+  const roomDeletedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Subscribe to room and players when roomId changes
   useEffect(() => {
@@ -41,6 +42,10 @@ export const useRoom = (roomId?: string) => {
     hadRoomRef.current = false;
     mountedRef.current = true;
     initialLoadRef.current = true;
+    if (roomDeletedTimeoutRef.current) {
+      clearTimeout(roomDeletedTimeoutRef.current);
+      roomDeletedTimeoutRef.current = null;
+    }
 
     const unsubRoom = subscribeToRoom(
       roomId,
@@ -48,6 +53,11 @@ export const useRoom = (roomId?: string) => {
         if (!mountedRef.current) return;
 
         if (roomData) {
+          // Clear any pending "room deleted" timeout - room is back
+          if (roomDeletedTimeoutRef.current) {
+            clearTimeout(roomDeletedTimeoutRef.current);
+            roomDeletedTimeoutRef.current = null;
+          }
           setRoom(roomData);
           hadRoomRef.current = true;
           initialLoadRef.current = false;
@@ -55,9 +65,16 @@ export const useRoom = (roomId?: string) => {
           setRoom(null);
           // Only set roomDeleted if we previously had a room (meaning it was deleted)
           // AND we're past the initial load phase
+          // Use a delay to avoid false positives during document updates
           if (hadRoomRef.current && !initialLoadRef.current) {
-            setRoomDeleted(true);
-            setError('Room has been closed by the host');
+            if (!roomDeletedTimeoutRef.current) {
+              roomDeletedTimeoutRef.current = setTimeout(() => {
+                if (mountedRef.current) {
+                  setRoomDeleted(true);
+                  setError('Room has been closed by the host');
+                }
+              }, 2000); // Wait 2 seconds before declaring room deleted
+            }
           } else if (!initialLoadRef.current) {
             setError('Room not found');
           }
@@ -82,6 +99,9 @@ export const useRoom = (roomId?: string) => {
 
     return () => {
       mountedRef.current = false;
+      if (roomDeletedTimeoutRef.current) {
+        clearTimeout(roomDeletedTimeoutRef.current);
+      }
       unsubRoom();
       unsubPlayers();
     };

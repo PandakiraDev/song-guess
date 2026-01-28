@@ -47,9 +47,10 @@ export const DownloadScreen: React.FC<DownloadScreenProps> = ({
   // Build song titles map
   const songTitles = new Map(songs.map((s) => [s.id, s.title]));
 
-  // Handle room deletion
+  // Handle room deletion (only for non-host players)
+  // Host should never see this during download - it's likely a false positive from subscription
   useEffect(() => {
-    if (roomDeleted) {
+    if (roomDeleted && !isHost) {
       Alert.alert(
         'Game Ended',
         'The host has closed the room.',
@@ -57,7 +58,7 @@ export const DownloadScreen: React.FC<DownloadScreenProps> = ({
         { cancelable: false }
       );
     }
-  }, [roomDeleted, navigation]);
+  }, [roomDeleted, isHost, navigation]);
 
   // Handle room status changes - game started
   useEffect(() => {

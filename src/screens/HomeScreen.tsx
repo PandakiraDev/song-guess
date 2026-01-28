@@ -39,17 +39,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         colors={[colors.background, colors.surface]}
         style={styles.gradient}
       >
-        {/* Top Bar with Settings */}
-        <View style={styles.topBar}>
-          <View style={styles.topBarSpacer} />
-          <TouchableOpacity
-            style={styles.settingsButton}
-            onPress={() => setShowServerSettings(true)}
-          >
-            <Ionicons name="server-outline" size={22} color={colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
-
         {/* Header */}
         <TouchableOpacity
           style={styles.header}
@@ -138,6 +127,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           />
         </View>
 
+        {/* Server Settings */}
+        <TouchableOpacity
+          style={styles.serverButton}
+          onPress={() => setShowServerSettings(true)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.serverButtonIcon}>
+            <Ionicons name="server" size={18} color={colors.neonBlue} />
+          </View>
+          <View style={styles.serverButtonText}>
+            <Text style={styles.serverButtonTitle}>Ustawienia serwera</Text>
+            <Text style={styles.serverButtonSubtitle}>Skonfiguruj serwer audio (Termux)</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+
         {/* How to Play */}
         <View style={styles.howToPlay}>
           <Text style={styles.howToPlayTitle}>How to Play</Text>
@@ -182,27 +187,8 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.lg,
   },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: spacing.xs,
-  },
-  topBarSpacer: {
-    width: 40,
-  },
-  settingsButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.surfaceLight,
-  },
   header: {
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
     borderWidth: 1,
@@ -281,6 +267,37 @@ const styles = StyleSheet.create({
   actions: {
     gap: spacing.md,
     paddingVertical: spacing.xl,
+  },
+  serverButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.neonBlue + '25',
+    gap: spacing.md,
+  },
+  serverButtonIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.neonBlue + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  serverButtonText: {
+    flex: 1,
+  },
+  serverButtonTitle: {
+    color: colors.textPrimary,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+  },
+  serverButtonSubtitle: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    marginTop: 1,
   },
   howToPlay: {
     marginTop: 'auto',
