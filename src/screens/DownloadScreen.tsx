@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import { DownloadProgress } from '../components/game';
 import { useRoom } from '../hooks/useRoom';
 import { useGame } from '../hooks/useGame';
 import { useGameStore } from '../store/gameStore';
-import { updateAudioStreamUrls } from '../services/roomService';
+import { getServerUrl } from '../services/settingsService';
 import {
   downloadAllSongs,
   clearAudioCache,
@@ -59,34 +59,50 @@ export const DownloadScreen: React.FC<DownloadScreenProps> = ({
     }
   }, [roomDeleted, navigation]);
 
-  // Handle room status changes
+  // Handle room status changes - game started
   useEffect(() => {
-    if (room?.status === 'playing') {
-      // Non-host players: load streaming URLs from Firebase before navigating
-      if (!isHost && room.audioStreamUrls) {
-        Object.entries(room.audioStreamUrls).forEach(([songId, uri]) => {
-          setAudioUri(songId, uri);
-        });
-        console.log('Loaded streaming URLs from Firebase');
-      }
+    if (room?.status === 'playing' && downloadComplete) {
       navigation.replace('Game', { roomId });
     } else if (room?.status === 'finished') {
       navigation.replace('Results', { roomId });
     }
-  }, [room?.status, roomId, navigation, isHost, room?.audioStreamUrls, setAudioUri]);
+  }, [room?.status, downloadComplete, roomId, navigation]);
 
-  // Start download when screen loads (host only)
+  // Start download when screen loads (ALL players download!)
   useEffect(() => {
-    if (!isHost || downloadStarted.current || songs.length === 0) return;
+    if (downloadStarted.current || songs.length === 0) return;
+
+    // Wait for server URL to be set by host
+    if (!isHost && !room?.serverUrl) {
+      console.log('Waiting for host to set server URL...');
+      return;
+    }
+
     downloadStarted.current = true;
     startDownload();
-  }, [isHost, songs]);
+  }, [songs, isHost, room?.serverUrl]);
 
   const startDownload = async () => {
     setIsDownloading(true);
     setHasError(false);
 
     try {
+      // Get server URL - host uses local setting, others MUST use room's serverUrl
+      let serverUrl: string;
+      if (isHost) {
+        serverUrl = await getServerUrl();
+        // Save server URL to Firebase for other players
+        await updateDoc(doc(db, 'rooms', roomId), { serverUrl });
+        console.log('Host set server URL:', serverUrl);
+      } else {
+        // Non-host MUST use server URL from Firebase (host's server)
+        if (!room?.serverUrl) {
+          throw new Error('Server URL not set by host yet');
+        }
+        serverUrl = room.serverUrl;
+        console.log('Using server URL from host:', serverUrl);
+      }
+
       // Clear old cache first
       await clearAudioCache();
 
@@ -106,7 +122,7 @@ export const DownloadScreen: React.FC<DownloadScreenProps> = ({
             setAudioUri(p.songId, p.localUri);
           }
         });
-      });
+      }, serverUrl);
 
       // Check for errors
       const errors = Array.from(result.values()).filter((p) => p.status === 'error');
@@ -120,22 +136,12 @@ export const DownloadScreen: React.FC<DownloadScreenProps> = ({
         (p) => p.status === 'completed'
       );
 
-      // Sync streaming URLs to Firebase so all players can access them
-      if (allCompleted) {
-        const streamUrls: Record<string, string> = {};
-        result.forEach((p) => {
-          if (p.localUri) {
-            streamUrls[p.songId] = p.localUri;
-          }
-        });
-
-        if (Object.keys(streamUrls).length > 0) {
-          await updateAudioStreamUrls(roomId, streamUrls);
-          console.log('Synced streaming URLs to Firebase');
-        }
-      }
-
       setDownloadComplete(allCompleted);
+
+      // If host and all done, mark ready
+      if (isHost && allCompleted) {
+        await updateDoc(doc(db, 'rooms', roomId), { hostDownloadComplete: true });
+      }
     } catch (error) {
       console.error('Download failed:', error);
       setHasError(true);
@@ -167,7 +173,6 @@ export const DownloadScreen: React.FC<DownloadScreenProps> = ({
   };
 
   const handleSkipDownload = async () => {
-    // Go back to original YouTube-based playback
     Alert.alert(
       'Skip Download',
       'This will use YouTube playback instead (with ads). Continue?',
@@ -187,14 +192,14 @@ export const DownloadScreen: React.FC<DownloadScreenProps> = ({
     );
   };
 
-  // Non-host view
-  if (!isHost) {
+  // Waiting for server URL (non-host only)
+  if (!isHost && !room?.serverUrl && !downloadStarted.current) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.waitingContainer}>
           <Text style={styles.waitingTitle}>Preparing Game</Text>
           <Text style={styles.waitingSubtitle}>
-            Host is downloading songs for ad-free playback...
+            Waiting for host to start download server...
           </Text>
           <View style={styles.loadingDots}>
             <View style={styles.dot} />
@@ -206,18 +211,38 @@ export const DownloadScreen: React.FC<DownloadScreenProps> = ({
     );
   }
 
+  // Downloading view (both host and players)
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>
+          {isHost ? 'Downloading Songs' : 'Downloading Songs'}
+        </Text>
+        <Text style={styles.headerSubtitle}>
+          {isHost
+            ? 'Please wait while songs are downloaded...'
+            : `Downloading from host server...`
+          }
+        </Text>
+      </View>
+
       <DownloadProgress progress={localProgress} songTitles={songTitles} />
 
       <View style={styles.footer}>
         {downloadComplete && !hasError ? (
-          <Button
-            title="Start Game"
-            onPress={handleStartGame}
-            size="large"
-            fullWidth
-          />
+          isHost ? (
+            <Button
+              title="Start Game"
+              onPress={handleStartGame}
+              size="large"
+              fullWidth
+            />
+          ) : (
+            <View style={styles.waitingForHost}>
+              <Text style={styles.readyText}>Download complete!</Text>
+              <Text style={styles.waitingText}>Waiting for host to start...</Text>
+            </View>
+          )
         ) : hasError ? (
           <View style={styles.errorButtons}>
             <Button
@@ -226,25 +251,29 @@ export const DownloadScreen: React.FC<DownloadScreenProps> = ({
               size="large"
               fullWidth
             />
-            <Button
-              title="Skip (Use YouTube)"
-              onPress={handleSkipDownload}
-              variant="outline"
-              size="large"
-              fullWidth
-            />
+            {isHost && (
+              <Button
+                title="Skip (Use YouTube)"
+                onPress={handleSkipDownload}
+                variant="outline"
+                size="large"
+                fullWidth
+              />
+            )}
           </View>
         ) : (
           <View style={styles.downloadingInfo}>
             <Text style={styles.downloadingText}>
               {isDownloading ? 'Downloading...' : 'Preparing...'}
             </Text>
-            <Button
-              title="Skip Download"
-              onPress={handleSkipDownload}
-              variant="ghost"
-              size="small"
-            />
+            {isHost && (
+              <Button
+                title="Skip Download"
+                onPress={handleSkipDownload}
+                variant="ghost"
+                size="small"
+              />
+            )}
           </View>
         )}
       </View>
@@ -256,6 +285,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  header: {
+    padding: spacing.lg,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    color: colors.textPrimary,
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.bold,
+    marginBottom: spacing.sm,
+  },
+  headerSubtitle: {
+    color: colors.textSecondary,
+    fontSize: fontSize.md,
+    textAlign: 'center',
   },
   waitingContainer: {
     flex: 1,
@@ -297,6 +341,19 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   downloadingText: {
+    color: colors.textSecondary,
+    fontSize: fontSize.md,
+  },
+  waitingForHost: {
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  readyText: {
+    color: colors.success,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
+  },
+  waitingText: {
     color: colors.textSecondary,
     fontSize: fontSize.md,
   },

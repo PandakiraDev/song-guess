@@ -180,7 +180,13 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         });
 
         const { sound, status } = await Audio.Sound.createAsync(
-          { uri: localUri },
+          {
+            uri: localUri,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36',
+              'Referer': 'https://www.youtube.com/',
+            }
+          },
           { shouldPlay: false, positionMillis: startTime * 1000 },
           onPlaybackStatusUpdate
         );
@@ -194,6 +200,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         }
       } catch (error) {
         console.error('AudioPlayer: Failed to load sound:', error);
+        console.error('AudioPlayer: URL was:', localUri);
+        // Call onReady anyway to not block the game
+        onReady?.();
       }
     };
 

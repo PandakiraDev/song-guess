@@ -26,64 +26,59 @@ const ensureCacheDir = async (): Promise<void> => {
   }
 };
 
-// Get audio stream URL from local yt-dlp server
-const getAudioUrl = async (videoId: string): Promise<string> => {
-  const serverUrl = await getServerUrl();
-  console.log(`Getting audio URL from server (${serverUrl}) for: ${videoId}`);
-
-  try {
-    const response = await fetch(`${serverUrl}/audio/${videoId}`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Server error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-
-    if (!data.success || !data.url) {
-      throw new Error(data.error || 'No audio URL returned');
-    }
-
-    console.log(`Got audio URL for ${videoId}`);
-    return data.url;
-
-  } catch (error) {
-    console.error(`Failed to get audio URL:`, error);
-
-    // Helpful error message
-    if (error instanceof TypeError && error.message.includes('Network request failed')) {
-      throw new Error('Cannot connect to local server. Make sure the server is running on port 3001.');
-    }
-
-    throw error;
-  }
-};
-
-// Get streaming URL for a song (no download needed - instant!)
+// Download audio file from server to local storage
 export const downloadSongAudio = async (
   videoId: string,
   songId: string,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  serverUrl?: string
 ): Promise<DownloadResult> => {
   try {
-    console.log(`Getting streaming URL for: ${videoId}`);
-    onProgress?.(0.5);
+    await ensureCacheDir();
 
-    const audioUrl = await getAudioUrl(videoId);
+    const localUri = `${AUDIO_CACHE_DIR}${songId}.m4a`;
 
-    console.log(`Got streaming URL for: ${songId}`);
+    // Check if already downloaded
+    const fileInfo = await FileSystemLegacy.getInfoAsync(localUri);
+    if (fileInfo.exists && 'size' in fileInfo && fileInfo.size > 0) {
+      console.log(`Already cached: ${songId}`);
+      onProgress?.(1);
+      return { success: true, localUri };
+    }
+
+    const server = serverUrl || await getServerUrl();
+    const downloadUrl = `${server}/download/${videoId}`;
+
+    console.log(`Downloading ${videoId} from ${downloadUrl}`);
+    onProgress?.(0.1);
+
+    // Download file
+    const downloadResult = await FileSystemLegacy.downloadAsync(
+      downloadUrl,
+      localUri,
+      {
+        headers: {
+          'Accept': 'audio/mp4,audio/*',
+        },
+      }
+    );
+
+    if (downloadResult.status !== 200) {
+      throw new Error(`Download failed with status ${downloadResult.status}`);
+    }
+
+    // Verify file was downloaded
+    const downloadedInfo = await FileSystemLegacy.getInfoAsync(localUri);
+    if (!downloadedInfo.exists || !('size' in downloadedInfo) || downloadedInfo.size === 0) {
+      throw new Error('Downloaded file is empty or missing');
+    }
+
+    console.log(`Downloaded ${songId}: ${downloadedInfo.size} bytes`);
     onProgress?.(1);
 
-    // Return the streaming URL directly - no download needed!
-    return { success: true, localUri: audioUrl };
+    return { success: true, localUri };
   } catch (error) {
-    console.error(`Failed to get audio URL for ${songId}:`, error);
+    console.error(`Failed to download ${songId}:`, error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -94,7 +89,8 @@ export const downloadSongAudio = async (
 // Download all songs for a game
 export const downloadAllSongs = async (
   songs: Array<{ id: string; youtubeId: string }>,
-  onProgressUpdate: (progress: Map<string, DownloadProgress>) => void
+  onProgressUpdate: (progress: Map<string, DownloadProgress>) => void,
+  serverUrl?: string
 ): Promise<Map<string, DownloadProgress>> => {
   const progressMap = new Map<string, DownloadProgress>();
 
@@ -110,7 +106,7 @@ export const downloadAllSongs = async (
 
   onProgressUpdate(new Map(progressMap));
 
-  // Download songs sequentially to avoid rate limiting
+  // Download songs sequentially
   for (const song of songs) {
     progressMap.set(song.id, {
       ...progressMap.get(song.id)!,
@@ -127,7 +123,8 @@ export const downloadAllSongs = async (
           progress,
         });
         onProgressUpdate(new Map(progressMap));
-      }
+      },
+      serverUrl
     );
 
     if (result.success) {

@@ -17,8 +17,6 @@ import {
   getServerUrl,
   setServerUrl,
   testServerConnection,
-  SERVER_PRESETS,
-  ServerPreset,
 } from '../../services/settingsService';
 import { Button } from './Button';
 
@@ -27,58 +25,23 @@ interface ServerSettingsModalProps {
   onClose: () => void;
 }
 
-interface PresetOption {
-  key: ServerPreset;
-  label: string;
-  description: string;
-  url: string;
-}
-
-const PRESET_OPTIONS: PresetOption[] = [
-  {
-    key: 'localhost',
-    label: 'Ten telefon (Termux)',
-    description: 'Serwer działa na tym samym telefonie',
-    url: SERVER_PRESETS.localhost,
-  },
-  {
-    key: 'emulator',
-    label: 'Emulator Android',
-    description: 'Serwer na komputerze, gra w emulatorze',
-    url: SERVER_PRESETS.emulator,
-  },
-  {
-    key: 'custom',
-    label: 'Inny telefon / komputer',
-    description: 'Podaj IP urządzenia w sieci lokalnej',
-    url: '',
-  },
-];
-
 export const ServerSettingsModal: React.FC<ServerSettingsModalProps> = ({
   visible,
   onClose,
 }) => {
-  const [selectedPreset, setSelectedPreset] = useState<ServerPreset>('localhost');
-  const [customUrl, setCustomUrl] = useState('http://192.168.1.100:3001');
+  const [serverIp, setServerIp] = useState('');
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
 
   // Load current settings
   useEffect(() => {
     const loadSettings = async () => {
       const url = await getServerUrl();
-
-      // Determine which preset matches
-      if (url === SERVER_PRESETS.localhost) {
-        setSelectedPreset('localhost');
-      } else if (url === SERVER_PRESETS.emulator) {
-        setSelectedPreset('emulator');
-      } else {
-        setSelectedPreset('custom');
-        setCustomUrl(url);
+      // Extract IP from URL like http://192.168.1.100:3001
+      const match = url.match(/http:\/\/([^:]+):3001/);
+      if (match) {
+        setServerIp(match[1]);
       }
     };
 
@@ -89,17 +52,22 @@ export const ServerSettingsModal: React.FC<ServerSettingsModalProps> = ({
   }, [visible]);
 
   const getCurrentUrl = (): string => {
-    if (selectedPreset === 'custom') {
-      return customUrl;
+    if (!serverIp.trim()) {
+      return '';
     }
-    return SERVER_PRESETS[selectedPreset];
+    return `http://${serverIp.trim()}:3001`;
   };
 
   const handleTest = async () => {
+    const url = getCurrentUrl();
+    if (!url) {
+      setTestResult({ success: false, message: 'Wpisz adres IP serwera' });
+      return;
+    }
+
     setIsTesting(true);
     setTestResult(null);
 
-    const url = getCurrentUrl();
     const result = await testServerConnection(url);
 
     setTestResult(result);
@@ -107,16 +75,16 @@ export const ServerSettingsModal: React.FC<ServerSettingsModalProps> = ({
   };
 
   const handleSave = async () => {
-    setIsSaving(true);
     const url = getCurrentUrl();
+    if (!url) {
+      setTestResult({ success: false, message: 'Wpisz adres IP serwera' });
+      return;
+    }
+
+    setIsSaving(true);
     await setServerUrl(url);
     setIsSaving(false);
     onClose();
-  };
-
-  const handlePresetSelect = (preset: ServerPreset) => {
-    setSelectedPreset(preset);
-    setTestResult(null);
   };
 
   return (
@@ -143,66 +111,38 @@ export const ServerSettingsModal: React.FC<ServerSettingsModalProps> = ({
           </View>
 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            {/* Info */}
+            {/* Info Box */}
             <View style={styles.infoBox}>
               <Ionicons name="information-circle" size={20} color={colors.neonBlue} />
               <Text style={styles.infoText}>
-                Serwer działa tylko lokalnie (Termux lub komputer w tej samej sieci WiFi). Tryb "YouTube" działa bez serwera.
+                Wpisz adres IP telefonu z serwerem (Termux).{'\n'}
+                Znajdziesz go w: Ustawienia → WiFi → szczegóły sieci
               </Text>
             </View>
 
-            {/* Preset Options */}
-            <Text style={styles.sectionTitle}>Wybierz lokalizację serwera</Text>
+            {/* IP Input */}
+            <View style={styles.ipInputContainer}>
+              <Text style={styles.inputLabel}>Adres IP serwera</Text>
+              <TextInput
+                style={styles.input}
+                value={serverIp}
+                onChangeText={(text) => {
+                  setServerIp(text);
+                  setTestResult(null);
+                }}
+                placeholder="np. 192.168.1.100"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="numeric"
+              />
+            </View>
 
-            {PRESET_OPTIONS.map((option) => (
-              <TouchableOpacity
-                key={option.key}
-                style={[
-                  styles.presetOption,
-                  selectedPreset === option.key && styles.presetOptionSelected,
-                ]}
-                onPress={() => handlePresetSelect(option.key)}
-              >
-                <View style={styles.presetRadio}>
-                  <View
-                    style={[
-                      styles.radioOuter,
-                      selectedPreset === option.key && styles.radioOuterSelected,
-                    ]}
-                  >
-                    {selectedPreset === option.key && <View style={styles.radioInner} />}
-                  </View>
-                </View>
-                <View style={styles.presetContent}>
-                  <Text style={styles.presetLabel}>{option.label}</Text>
-                  <Text style={styles.presetDescription}>{option.description}</Text>
-                  {option.key !== 'custom' && (
-                    <Text style={styles.presetUrl}>{option.url}</Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
-
-            {/* Custom URL Input */}
-            {selectedPreset === 'custom' && (
-              <View style={styles.customUrlContainer}>
-                <Text style={styles.inputLabel}>Adres serwera</Text>
-                <TextInput
-                  style={styles.input}
-                  value={customUrl}
-                  onChangeText={(text) => {
-                    setCustomUrl(text);
-                    setTestResult(null);
-                  }}
-                  placeholder="http://192.168.1.100:3001"
-                  placeholderTextColor={colors.textMuted}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="url"
-                />
-                <Text style={styles.inputHint}>
-                  Podaj IP urządzenia z serwerem (znajdziesz je w ustawieniach WiFi)
-                </Text>
+            {/* Current URL Preview */}
+            {serverIp.trim() && (
+              <View style={styles.urlPreview}>
+                <Text style={styles.urlLabel}>Pełny adres:</Text>
+                <Text style={styles.urlValue}>{getCurrentUrl()}</Text>
               </View>
             )}
 
@@ -247,45 +187,16 @@ export const ServerSettingsModal: React.FC<ServerSettingsModalProps> = ({
               )}
             </View>
 
-            {/* Help Section */}
-            <TouchableOpacity
-              style={styles.helpToggle}
-              onPress={() => setShowHelp(!showHelp)}
-            >
-              <Ionicons
-                name={showHelp ? 'chevron-up' : 'help-circle-outline'}
-                size={20}
-                color={colors.textSecondary}
-              />
-              <Text style={styles.helpToggleText}>
-                {showHelp ? 'Ukryj instrukcję' : 'Jak uruchomić serwer?'}
+            {/* Help */}
+            <View style={styles.helpBox}>
+              <Text style={styles.helpTitle}>Jak znaleźć IP?</Text>
+              <Text style={styles.helpText}>
+                Na telefonie z Termuxem:{'\n'}
+                • Otwórz Termux{'\n'}
+                • Wpisz: ip addr | grep inet{'\n'}
+                • Szukaj adresu zaczynającego się od 192.168.x.x lub 10.x.x.x
               </Text>
-            </TouchableOpacity>
-
-            {showHelp && (
-              <View style={styles.helpContent}>
-                <Text style={styles.helpTitle}>Termux (na telefonie):</Text>
-                <View style={styles.codeBlock}>
-                  <Text style={styles.codeText}>pkg install python nodejs</Text>
-                  <Text style={styles.codeText}>pip install yt-dlp</Text>
-                  <Text style={styles.codeText}>cd song-guess-server</Text>
-                  <Text style={styles.codeText}>npm start</Text>
-                </View>
-
-                <Text style={styles.helpTitle}>Komputer (Node.js):</Text>
-                <View style={styles.codeBlock}>
-                  <Text style={styles.codeText}>cd server</Text>
-                  <Text style={styles.codeText}>npm install</Text>
-                  <Text style={styles.codeText}>npm start</Text>
-                </View>
-
-                <Text style={styles.helpNote}>
-                  Serwer wymaga zainstalowanego yt-dlp.{'\n'}
-                  Windows: winget install yt-dlp{'\n'}
-                  Mac: brew install yt-dlp
-                </Text>
-              </View>
-            )}
+            </View>
           </ScrollView>
 
           {/* Footer */}
@@ -294,7 +205,7 @@ export const ServerSettingsModal: React.FC<ServerSettingsModalProps> = ({
               title={isSaving ? 'Zapisywanie...' : 'Zapisz'}
               onPress={handleSave}
               fullWidth
-              disabled={isSaving}
+              disabled={isSaving || !serverIp.trim()}
             />
           </View>
         </View>
@@ -313,7 +224,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
-    maxHeight: '90%',
+    maxHeight: '85%',
   },
   header: {
     flexDirection: 'row',
@@ -354,94 +265,45 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     lineHeight: 20,
   },
-  sectionTitle: {
-    color: colors.textPrimary,
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.semibold,
-    marginBottom: spacing.md,
-  },
-  presetOption: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: spacing.md,
-    backgroundColor: colors.background,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  presetOptionSelected: {
-    borderColor: colors.neonBlue,
-    backgroundColor: colors.neonBlue + '10',
-  },
-  presetRadio: {
-    marginRight: spacing.md,
-    paddingTop: 2,
-  },
-  radioOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: colors.textMuted,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioOuterSelected: {
-    borderColor: colors.neonBlue,
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.neonBlue,
-  },
-  presetContent: {
-    flex: 1,
-  },
-  presetLabel: {
-    color: colors.textPrimary,
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.medium,
-    marginBottom: 2,
-  },
-  presetDescription: {
-    color: colors.textSecondary,
-    fontSize: fontSize.sm,
-  },
-  presetUrl: {
-    color: colors.textMuted,
-    fontSize: fontSize.xs,
-    fontFamily: 'monospace',
-    marginTop: spacing.xs,
-  },
-  customUrlContainer: {
-    marginTop: spacing.md,
+  ipInputContainer: {
     marginBottom: spacing.md,
   },
   inputLabel: {
-    color: colors.textSecondary,
-    fontSize: fontSize.sm,
-    marginBottom: spacing.xs,
+    color: colors.textPrimary,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
+    marginBottom: spacing.sm,
   },
   input: {
     backgroundColor: colors.background,
     borderRadius: borderRadius.md,
-    padding: spacing.md,
+    padding: spacing.lg,
     color: colors.textPrimary,
-    fontSize: fontSize.md,
+    fontSize: fontSize.xl,
     fontFamily: 'monospace',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.surfaceLight,
+    textAlign: 'center',
   },
-  inputHint: {
+  urlPreview: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  urlLabel: {
     color: colors.textMuted,
     fontSize: fontSize.xs,
-    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  urlValue: {
+    color: colors.neonGreen,
+    fontSize: fontSize.md,
+    fontFamily: 'monospace',
   },
   testSection: {
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   testButton: {
     flexDirection: 'row',
@@ -478,53 +340,26 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
   },
-  footer: {
-    padding: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.surfaceLight,
-  },
-  helpToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    marginTop: spacing.sm,
-  },
-  helpToggleText: {
-    color: colors.textSecondary,
-    fontSize: fontSize.sm,
-  },
-  helpContent: {
+  helpBox: {
     backgroundColor: colors.background,
     borderRadius: borderRadius.md,
     padding: spacing.md,
-    marginBottom: spacing.md,
   },
   helpTitle: {
     color: colors.textPrimary,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.semibold,
-    marginBottom: spacing.xs,
-    marginTop: spacing.sm,
-  },
-  codeBlock: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.sm,
-    padding: spacing.sm,
     marginBottom: spacing.sm,
   },
-  codeText: {
-    color: colors.neonGreen,
-    fontSize: fontSize.xs,
-    fontFamily: 'monospace',
-    lineHeight: 18,
+  helpText: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+    lineHeight: 20,
   },
-  helpNote: {
-    color: colors.textMuted,
-    fontSize: fontSize.xs,
-    lineHeight: 16,
-    marginTop: spacing.sm,
+  footer: {
+    padding: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.surfaceLight,
   },
 });
 

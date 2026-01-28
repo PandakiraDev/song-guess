@@ -43,6 +43,8 @@ export interface Room {
   currentSongIndex: number;
   shuffledSongIds?: string[]; // Song IDs in shuffled order for the game
   audioStreamUrls?: Record<string, string>; // songId -> streaming URL (synced from host)
+  serverUrl?: string; // yt-dlp server URL for downloading songs
+  hostDownloadComplete?: boolean; // Host finished downloading all songs
   votingActive?: boolean; // Whether voting is currently active (synced across clients)
   playbackStarted?: boolean; // Whether video player should render (ads may play)
   musicPlaying?: boolean; // Whether actual music should play (after all ready, synced start)

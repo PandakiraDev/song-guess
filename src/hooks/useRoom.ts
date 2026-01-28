@@ -29,6 +29,8 @@ export const useRoom = (roomId?: string) => {
   const [error, setError] = useState<string | null>(null);
   const [roomDeleted, setRoomDeleted] = useState(false);
   const hadRoomRef = useRef(false);
+  const mountedRef = useRef(true);
+  const initialLoadRef = useRef(true);
 
   // Subscribe to room and players when roomId changes
   useEffect(() => {
@@ -37,26 +39,33 @@ export const useRoom = (roomId?: string) => {
     // Reset state when subscribing to new room
     setRoomDeleted(false);
     hadRoomRef.current = false;
+    mountedRef.current = true;
+    initialLoadRef.current = true;
 
     const unsubRoom = subscribeToRoom(
       roomId,
       (roomData) => {
+        if (!mountedRef.current) return;
+
         if (roomData) {
           setRoom(roomData);
           hadRoomRef.current = true;
+          initialLoadRef.current = false;
         } else {
           setRoom(null);
           // Only set roomDeleted if we previously had a room (meaning it was deleted)
-          // or if we're trying to access a non-existent room
-          if (hadRoomRef.current) {
+          // AND we're past the initial load phase
+          if (hadRoomRef.current && !initialLoadRef.current) {
             setRoomDeleted(true);
             setError('Room has been closed by the host');
-          } else {
+          } else if (!initialLoadRef.current) {
             setError('Room not found');
           }
+          // During initial load, just wait - room data may still be coming
         }
       },
       (error) => {
+        if (!mountedRef.current) return;
         setError('Connection error: ' + error.message);
       }
     );
@@ -72,6 +81,7 @@ export const useRoom = (roomId?: string) => {
     );
 
     return () => {
+      mountedRef.current = false;
       unsubRoom();
       unsubPlayers();
     };

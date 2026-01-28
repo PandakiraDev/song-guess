@@ -239,7 +239,8 @@ export const subscribeToRoom = (
     (error) => {
       console.error('Room subscription error:', error);
       onError?.(error);
-      callback(null);
+      // Don't call callback(null) on error - this would incorrectly mark room as deleted
+      // The error handler will deal with connection issues separately
     }
   );
 };

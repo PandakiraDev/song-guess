@@ -30,6 +30,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({ navigation, route }) => 
   const { user } = useAuth();
   const { room, players, isHost, roomDeleted } = useRoom(roomId);
   const { audioUris } = useGameStore();
+
+  // Audio URIs are now local files downloaded in DownloadScreen
+  // No need to load from Firebase anymore
   const {
     currentSong,
     currentSongIndex,
